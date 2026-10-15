@@ -404,9 +404,10 @@
           "properties": {
             "owasp": {
               "type": "array",
+              "description": "OWASP API Top 10 2023 (API1-API10) or OWASP Top 10 2021 (A01-A10)",
               "items": {
                 "type": "string",
-                "pattern": "^API([1-9]|10)(:2023)?$"
+                "pattern": "^(API([1-9]|10)(:2023)?|A(0[1-9]|10)(:2021)?)$"
               }
             },
             "cwe": {
