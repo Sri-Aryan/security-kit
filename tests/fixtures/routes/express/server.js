@@ -1,0 +1,11 @@
+const express = require('express');
+const users = require('./routes/users');
+const { requireAuth } = require('./auth');
+const app = express();
+app.use(express.json());
+// app.get('/commented-out', handler);
+app.get('/health', (req, res) => res.json({ ok: true }));
+app.use('/api/users', requireAuth, users);
+app.post('/login', loginLimiter, async (req, res) => {});
+app.route('/items').get(listItems).post(requireAuth, createItem);
+module.exports = app;
