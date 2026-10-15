@@ -238,7 +238,7 @@ def redact(line, m, group):
         secret = m.group(0)
     if not secret or len(secret) < 6:
         return line
-    return line.replace(secret, secret[:4] + "…[redacted]")
+    return line.replace(secret, secret[:4] + "...[redacted]")
 
 
 def window_has(rx, lines, i, n):
