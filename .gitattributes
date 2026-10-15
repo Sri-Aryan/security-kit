@@ -1,0 +1,4 @@
+# Buyers install by cloning (npx github:...). Force LF everywhere so shell scripts run
+# under bash on Windows too, and installed file hashes are identical on every platform.
+* text=auto eol=lf
+*.ps1 text eol=crlf
