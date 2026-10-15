@@ -18,7 +18,14 @@ Do not run any scans from this skill.
 | `/sk-api --fix` | Same audit, then proposes low-risk fixes one by one and applies only the ones the user approves. | |
 | `/sk-api --section <name>` | Runs one checklist section only, e.g. `--section authz`. | |
 | `/sk-api --base-url http://localhost:3000` | Adds dynamic HTTP checks against a running app (localhost, or a host the user confirms they own). | |
+| `/sk-graphql` | Audits GraphQL APIs: introspection, depth/cost limits, batching and alias abuse, field- and object-level authorization, error leaks, CSRF. Writes `security-report-graphql.md`. | |
+| `/sk-graphql --url http://localhost:4000/graphql` | Adds read-only probes against a running GraphQL endpoint. | |
+| `/sk-webhooks` | Audits webhooks you receive (signature verification, raw body, replay, idempotency) and send (SSRF on user URLs, redirects, signing). Writes `security-report-webhooks.md`. | |
+| `/sk-webhooks --url http://localhost:3000/webhooks/x` | Adds probes (unsigned / bad signature / oversized) against one receiver, after the user confirms. | |
+| `/sk-openapi` | Compares the OpenAPI/Swagger spec with the code (undocumented, stale, auth mismatches) and lints the contract. Writes `security-report-openapi.md`. | |
 | `/sk-help` | This list. | |
+
+All audit commands accept `--section <name>`, `--tests` and `--fix`.
 
 Coming later: `sk-auth`, `sk-secrets`, `sk-deps`, `sk-inject`, `sk-config`, `sk-mobile`, `sk-ai`, `sk-audit`.
 

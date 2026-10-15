@@ -69,7 +69,9 @@ Discovery is heuristic. Spot-check it: open the router setup and confirm global 
 (e.g. `app.use(authenticate)` before routers, `DEFAULT_PERMISSION_CLASSES`, Spring `SecurityFilterChain`).
 Fix `auth` values you can prove wrong and note it. If an OpenAPI spec exists, compare it with
 the discovered routes: undocumented routes and documented-but-missing routes go into the
-inventory checks.
+inventory checks. For a full contract audit (spec-vs-code auth mismatches, open schemas, limits),
+suggest `/sk-openapi`. If the project exposes GraphQL or webhooks, suggest `/sk-graphql` and
+`/sk-webhooks`; this skill covers the REST surface only.
 
 ## Step 3: Static scan
 
