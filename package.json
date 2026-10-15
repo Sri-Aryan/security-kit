@@ -1,0 +1,30 @@
+{
+  "name": "@getsecuritykit/kit",
+  "version": "0.1.0",
+  "description": "Security skills for AI coding agents (Claude Code, OpenAI Codex). Run /sk-api to audit your APIs.",
+  "private": true,
+  "license": "UNLICENSED",
+  "bin": {
+    "securitykit": "bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "skills/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node tests/run.js",
+    "test:node": "node tests/run.js --node-only",
+    "test:py": "python -m unittest discover -s tests -p \"test_*.py\" -v"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/getsecuritykit/kit.git"
+  }
+}

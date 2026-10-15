@@ -1,0 +1,8 @@
+node_modules/
+.claude/settings.local.json
+__pycache__/
+*.pyc
+.DS_Store
+# reports written when running the kit against the example app
+examples/**/security-report.md
+examples/**/.securitykit/
