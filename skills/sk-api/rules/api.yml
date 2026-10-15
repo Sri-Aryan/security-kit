@@ -1,0 +1,754 @@
+# SecurityKit sk-api Semgrep rules.
+#
+# Every result is a CANDIDATE. The agent confirms or rejects it by reading the code.
+# metadata.check_id maps each rule to an ID in ../checklist.md.
+# Tests: tests/semgrep/ (semgrep --test style "ruleid:" / "ok:" annotations).
+
+rules:
+  # ======================================================================= AUTHN
+  - id: sk-express-state-change-without-middleware
+    message: >-
+      State-changing route registered with only a handler (no middleware). If this router is not
+      mounted behind auth, anyone can call it. Confirm auth is applied (router-level use(), mount, or inside the handler).
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata: { check_id: API-AUTHN-001, cwe: CWE-306, owasp: API2, confidence: LOW }
+    patterns:
+      - pattern: $APP.$M("$PATH", $HANDLER)
+      - metavariable-regex: { metavariable: $APP, regex: '^(app|router|api|routes|server)$' }
+      - metavariable-regex: { metavariable: $M, regex: '^(post|put|patch|delete)$' }
+      - metavariable-regex:
+          metavariable: $PATH
+          regex: (?i)^(?!.*(login|logout|signin|signup|register|auth|token|webhook|health|status|public|password/(reset|forgot))).*$
+
+  - id: sk-express-admin-route-without-middleware
+    message: Admin route registered with only a handler (no auth or role middleware).
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-AUTHZ-002, cwe: CWE-285, owasp: API5, confidence: MEDIUM }
+    patterns:
+      - pattern: $APP.$M("$PATH", $HANDLER)
+      - metavariable-regex: { metavariable: $APP, regex: '^(app|router|api|routes|server)$' }
+      - metavariable-regex: { metavariable: $M, regex: '^(get|post|put|patch|delete|all)$' }
+      - metavariable-regex: { metavariable: $PATH, regex: '(?i).*admin' }
+
+  - id: sk-flask-state-change-without-auth-decorator
+    message: >-
+      Flask route accepting a state-changing method has no decorator besides the route itself.
+      Confirm authentication is enforced (before_request, blueprint guard, or inside the view).
+    severity: WARNING
+    languages: [python]
+    metadata: { check_id: API-AUTHN-001, cwe: CWE-306, owasp: API2, confidence: LOW }
+    patterns:
+      - pattern-either:
+          - pattern: |
+              @$APP.route($PATH, ..., methods=[..., "$METHOD", ...], ...)
+              def $F(...):
+                ...
+          - pattern: |
+              @$APP.$METHOD($PATH, ...)
+              def $F(...):
+                ...
+      - metavariable-regex: { metavariable: $METHOD, regex: '(?i)^(post|put|patch|delete)$' }
+      - metavariable-regex:
+          metavariable: $PATH
+          regex: (?i)^(?!.*(login|logout|signin|signup|register|auth|token|webhook|health)).*$
+      - pattern-not: |
+          @$D1
+          @$D2(...)
+          def $F(...):
+            ...
+      - pattern-not: |
+          @$D2(...)
+          @$D1
+          def $F(...):
+            ...
+      - pattern-not: |
+          @$D2(...)
+          @$D3(...)
+          def $F(...):
+            ...
+      - pattern-not: |
+          @$APP.$METHOD(..., dependencies=[...], ...)
+          def $F(...):
+            ...
+      - pattern-not: |
+          @$APP.$METHOD(...)
+          def $F(..., $P = Depends(...), ...):
+            ...
+      - pattern-not: |
+          @$APP.$METHOD(...)
+          def $F(..., $P: $T = Depends(...), ...):
+            ...
+      - pattern-not: |
+          @$APP.$METHOD(...)
+          def $F(..., $P: Annotated[..., Depends(...)], ...):
+            ...
+
+  - id: sk-jwt-decode-without-verify-js
+    message: >-
+      jwt.decode() does NOT verify the signature. If the result is used to identify the user,
+      anyone can forge a token. Use jwt.verify(token, key, { algorithms: [...] }).
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-AUTHN-002, cwe: CWE-347, owasp: API2, confidence: HIGH }
+    pattern-either:
+      - pattern: jwt.decode(...)
+      - pattern: jsonwebtoken.decode(...)
+      - pattern: jose.decodeJwt(...)
+      - pattern: decodeJwt(...)
+
+  - id: sk-jwt-decode-without-verify-py
+    message: JWT decoded with signature verification disabled. Anyone can forge a token.
+    severity: ERROR
+    languages: [python]
+    metadata: { check_id: API-AUTHN-002, cwe: CWE-347, owasp: API2, confidence: HIGH }
+    pattern-either:
+      - pattern: 'jwt.decode(..., options={..., "verify_signature": False, ...}, ...)'
+      - pattern: jwt.decode(..., verify=False, ...)
+      - pattern: jwt.get_unverified_claims(...)
+      - pattern: jose.jwt.get_unverified_claims(...)
+
+  - id: sk-jwt-decode-without-verify-go
+    message: JWT parsed without verifying the signature (ParseUnverified). Anyone can forge a token.
+    severity: ERROR
+    languages: [go]
+    metadata: { check_id: API-AUTHN-002, cwe: CWE-347, owasp: API2, confidence: MEDIUM }
+    pattern: $P.ParseUnverified(...)
+
+  - id: sk-jwt-none-algorithm
+    message: JWT 'none' algorithm is allowed or used. Unsigned tokens would be accepted.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-AUTHN-003, cwe: CWE-327, owasp: API2, confidence: HIGH }
+    pattern-either:
+      - pattern: '$J.verify($T, $K, {..., algorithms: [..., "none", ...], ...}, ...)'
+      - pattern: '$J.sign($P, $K, {..., algorithm: "none", ...}, ...)'
+
+  - id: sk-jwt-none-algorithm-py
+    message: JWT 'none' algorithm is allowed or used. Unsigned tokens would be accepted.
+    severity: ERROR
+    languages: [python]
+    metadata: { check_id: API-AUTHN-003, cwe: CWE-327, owasp: API2, confidence: HIGH }
+    pattern-either:
+      - pattern: $JWT.decode(..., algorithms=[..., "none", ...], ...)
+      - pattern: $JWT.encode(..., algorithm="none", ...)
+
+  - id: sk-jwt-verify-algorithms-not-pinned
+    message: >-
+      jwt.verify() without an explicit algorithms list. Pin the algorithm(s) you issue
+      (e.g. { algorithms: ['HS256'] }) to prevent algorithm confusion.
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata: { check_id: API-AUTHN-003, cwe: CWE-327, owasp: API2, confidence: LOW }
+    patterns:
+      - pattern-either:
+          - pattern: jwt.verify($T, $K)
+          - pattern: jwt.verify($T, $K, $CB)
+      - pattern-not: jwt.verify($T, $K, {...})
+
+  - id: sk-login-without-rate-limit-express
+    message: >-
+      Login/auth route has no rate-limiting middleware in its arguments. Confirm a limiter is
+      applied globally or on the router; otherwise credentials can be brute-forced.
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata: { check_id: API-AUTHN-004, cwe: CWE-307, owasp: API4, confidence: LOW }
+    patterns:
+      - pattern: $APP.post("$PATH", $...ARGS)
+      - metavariable-regex: { metavariable: $APP, regex: '^(app|router|api|routes|server|auth|authRouter)$' }
+      - metavariable-regex: { metavariable: $PATH, regex: '(?i).*(login|signin|sign-in|authenticate|/token|otp|verify|password)' }
+      - metavariable-regex: { metavariable: $...ARGS, regex: '(?is)^(?!.*(limit|throttl|slow|brute|captcha)).*$' }
+
+  # ======================================================================= AUTHZ
+  - id: sk-express-idor-param-lookup-without-user
+    message: >-
+      Handler loads a record by a URL parameter but never references the current user
+      (req.user / res.locals.user). Unless the resource is public, any caller can read or change
+      other users' records (IDOR/BOLA). Scope the query to the owner or check ownership.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-AUTHZ-001, cwe: CWE-639, owasp: API1, confidence: MEDIUM }
+    patterns:
+      - pattern: $APP.$M("$PATH", ..., $HANDLER)
+      - metavariable-regex: { metavariable: $APP, regex: '^(app|router|api|routes|server)$' }
+      - metavariable-regex: { metavariable: $M, regex: '^(get|put|patch|delete|all)$' }
+      - metavariable-regex: { metavariable: $PATH, regex: '.*:\w+' }
+      - metavariable-regex:
+          metavariable: $HANDLER
+          regex: (?s)^(?!.*\b(req|request)\.(user|auth)\b)(?!.*\blocals\.user\b)(?=.*\b(req|request)\.params\b).*(=>|function).*$
+
+  - id: sk-mass-assignment-js
+    message: >-
+      Request body passed straight into a model/update. Callers can set fields they should not
+      (role, isAdmin, ownerId, balance). Copy an allow-list of fields instead.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-AUTHZ-003, cwe: CWE-915, owasp: API3, confidence: MEDIUM }
+    pattern-either:
+      - pattern: Object.assign($T, $REQ.body)
+      - pattern: Object.assign($T, ..., $REQ.body, ...)
+      - pattern: "{..., ...$REQ.body, ...}"
+      - pattern: new $M($REQ.body)
+      - patterns:
+          - pattern-either:
+              - pattern: $M.$F($REQ.body, ...)
+              - pattern: $M.$F($ID, $REQ.body, ...)
+              - pattern: $M.$F({...}, $REQ.body, ...)
+          - metavariable-regex:
+              metavariable: $F
+              regex: ^(create|build|insert|insertOne|insertMany|update|updateOne|updateMany|upsert|findByIdAndUpdate|findOneAndUpdate|bulkCreate|save|set)$
+
+  - id: sk-mass-assignment-py
+    message: >-
+      Request data unpacked straight into a model. Callers can set protected fields
+      (is_admin, role, owner). Use a serializer/schema with an explicit field list.
+    severity: ERROR
+    languages: [python]
+    metadata: { check_id: API-AUTHZ-003, cwe: CWE-915, owasp: API3, confidence: MEDIUM }
+    pattern-either:
+      - pattern: $M(**request.$X)
+      - pattern: $M(**request.$F(...))
+      - pattern: $M.objects.create(**$D)
+      - pattern: $M.objects.filter(...).update(**request.$X)
+      - pattern: |
+          for $K, $V in $D.items():
+            ...
+            setattr($OBJ, $K, $V)
+      - pattern: $M(**$BODY.dict())
+      - pattern: $M(**$BODY.model_dump())
+
+  - id: sk-drf-serializer-all-fields
+    message: >-
+      ModelSerializer exposes all fields (fields = '__all__'). Writable protected fields enable
+      mass assignment and responses may leak sensitive data. List fields explicitly.
+    severity: WARNING
+    languages: [python]
+    metadata: { check_id: API-AUTHZ-003, cwe: CWE-915, owasp: API3, confidence: MEDIUM }
+    pattern: |
+      class $S(...):
+        ...
+        class Meta:
+          ...
+          fields = "__all__"
+
+  # ======================================================================= INJECTION
+  - id: sk-sql-injection-js
+    message: >-
+      User input reaches a SQL query string. Use parameterised queries
+      (db.query('... WHERE id = ?', [id]) / tagged templates in your ORM).
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-INJ-001, cwe: CWE-89, owasp: API8, confidence: HIGH }
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: $REQ.query
+              - pattern: $REQ.body
+              - pattern: $REQ.params
+              - pattern: $REQ.headers
+              - pattern: $REQ.cookies
+          - metavariable-regex: { metavariable: $REQ, regex: '^(req|request|ctx)$' }
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $DB.$Q($SQL, ...)
+          - metavariable-regex:
+              metavariable: $Q
+              regex: ^(query|execute|exec|raw|run|all|get|prepare|each|unsafe|\$queryRawUnsafe|\$executeRawUnsafe|sequelize\.query)$
+          # Only database-like receivers: avoids axios.get(), child_process.exec(), cache.get().
+          - metavariable-regex:
+              metavariable: $DB
+              regex: (?i)^(.*(db|database|conn|pool|knex|sequelize|prisma|sql|pg|mysql|sqlite|cursor|tx|trx|repo|manager)|client)$
+          - focus-metavariable: $SQL
+    pattern-sanitizers:
+      - pattern: parseInt(...)
+      - pattern: Number(...)
+      - pattern: $DB.escape(...)
+      - pattern: mysql.escape(...)
+
+  - id: sk-sql-string-building
+    message: >-
+      SQL built by string concatenation/formatting. If any part comes from a request, this is SQL
+      injection. Use bound parameters.
+    severity: WARNING
+    languages: [regex]
+    metadata: { check_id: API-INJ-001, cwe: CWE-89, owasp: API8, confidence: MEDIUM }
+    paths:
+      include: ["*.js", "*.mjs", "*.cjs", "*.ts", "*.py", "*.java", "*.kt", "*.go", "*.php", "*.rb", "*.cs"]
+    pattern-either:
+      # One alternative per quote style so SQL containing the other quote ('...') still matches.
+      # "SELECT ... " + var
+      - pattern-regex: (?i)"\s*(SELECT\s+[\w*,.\s()]+?\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^"\n]*"\s*\+\s*[\w$(]
+      - pattern-regex: (?i)'\s*(SELECT\s+[\w*,.\s()]+?\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^'\n]*'\s*\+\s*[\w$(]
+      # JS template literal with ${...}
+      - pattern-regex: (?i)`\s*(SELECT\s+[\w*,.\s()]+?\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^`]*\$\{
+      # Python f-strings
+      - pattern-regex: (?i)\bf"(SELECT\s+[\w*,.\s()]+?\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^"\n]*\{
+      - pattern-regex: (?i)\bf'(SELECT\s+[\w*,.\s()]+?\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^'\n]*\{
+      # Python % / .format()
+      - pattern-regex: (?i)"(SELECT\s+[\w*,.\s()]+?\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^"\n]*"\s*(%\s*[\w(]|\.format\()
+      - pattern-regex: (?i)'(SELECT\s+[\w*,.\s()]+?\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^'\n]*'\s*(%\s*[\w(]|\.format\()
+      # Go fmt.Sprintf / Java String.format with %s
+      - pattern-regex: (?i)(Sprintf|String\.format)\(\s*"(SELECT\s+[\w*,.\s()]+?\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)[^"]*%[sv]
+
+  - id: sk-sql-injection-py
+    message: User input reaches a SQL string. Pass parameters separately (cursor.execute(sql, params)).
+    severity: ERROR
+    languages: [python]
+    metadata: { check_id: API-INJ-001, cwe: CWE-89, owasp: API8, confidence: HIGH }
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: request.args
+          - pattern: request.form
+          - pattern: request.json
+          - pattern: request.get_json(...)
+          - pattern: request.values
+          - pattern: request.GET
+          - pattern: request.POST
+          - pattern: request.data
+          - pattern: request.query_params
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $C.execute($SQL, ...)
+              - pattern: $C.executemany($SQL, ...)
+              - pattern: $C.raw($SQL, ...)
+              - pattern: text($SQL)
+              - pattern: $M.objects.extra(where=$SQL)
+          - focus-metavariable: $SQL
+
+  - id: sk-nosql-operator-injection
+    message: >-
+      Request value used directly as a MongoDB query value. A JSON body like {"$ne": null}
+      becomes a query operator (login bypass, data dump). Cast to string or sanitize with
+      express-mongo-sanitize / a schema.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-INJ-002, cwe: CWE-943, owasp: API8, confidence: MEDIUM }
+    patterns:
+      - pattern-either:
+          - pattern: "$M.$F({..., $K: $REQ.$SRC.$X, ...}, ...)"
+          - pattern: $M.$F($REQ.$SRC, ...)
+          - pattern: "$M.$F({..., $where: $V, ...}, ...)"
+      - metavariable-regex: { metavariable: $SRC, regex: '^(body|query)$' }
+      - metavariable-regex:
+          metavariable: $F
+          regex: ^(find|findOne|findOneAndUpdate|findOneAndDelete|findOneAndReplace|updateOne|updateMany|deleteOne|deleteMany|countDocuments|count|exists|distinct)$
+
+  - id: sk-command-injection-js
+    message: User input reaches a shell command. Use execFile/spawn with an argument array and no shell.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-INJ-003, cwe: CWE-78, owasp: API8, confidence: HIGH }
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: $REQ.query
+              - pattern: $REQ.body
+              - pattern: $REQ.params
+          - metavariable-regex: { metavariable: $REQ, regex: '^(req|request|ctx)$' }
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: exec($CMD, ...)
+              - pattern: execSync($CMD, ...)
+              - pattern: $CP.exec($CMD, ...)
+              - pattern: $CP.execSync($CMD, ...)
+              - pattern: '$CP.spawn($CMD, ..., {..., shell: true, ...})'
+              - pattern: 'spawn($CMD, ..., {..., shell: true, ...})'
+          - focus-metavariable: $CMD
+
+  - id: sk-command-injection-py
+    message: Shell command built from a variable. Use subprocess.run([...]) with a list and shell=False.
+    severity: ERROR
+    languages: [python]
+    metadata: { check_id: API-INJ-003, cwe: CWE-78, owasp: API8, confidence: MEDIUM }
+    patterns:
+      - pattern-either:
+          - pattern: os.system($CMD)
+          - pattern: os.popen($CMD, ...)
+          - pattern: subprocess.$F($CMD, ..., shell=True, ...)
+      - pattern-not: os.system("...")
+      - pattern-not: os.popen("...", ...)
+      - pattern-not: subprocess.$F("...", ..., shell=True, ...)
+
+  - id: sk-command-injection-go
+    message: Shell invoked with a constructed command string. Pass arguments separately to exec.Command.
+    severity: ERROR
+    languages: [go]
+    metadata: { check_id: API-INJ-003, cwe: CWE-78, owasp: API8, confidence: MEDIUM }
+    patterns:
+      - pattern-either:
+          - pattern: exec.Command("sh", "-c", $CMD)
+          - pattern: exec.Command("bash", "-c", $CMD)
+          - pattern: exec.Command("cmd", "/C", $CMD)
+      - pattern-not: exec.Command($SH, $C, "...")
+
+  - id: sk-path-traversal-js
+    message: >-
+      User input used in a file path. "../" can escape the intended directory. Resolve the path
+      and verify it starts with the allowed base directory, or use path.basename().
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-INJ-004, cwe: CWE-22, owasp: API8, confidence: HIGH }
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: $REQ.query
+              - pattern: $REQ.body
+              - pattern: $REQ.params
+          - metavariable-regex: { metavariable: $REQ, regex: '^(req|request|ctx)$' }
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $FS.readFile($P, ...)
+              - pattern: $FS.readFileSync($P, ...)
+              - pattern: $FS.createReadStream($P, ...)
+              - pattern: $FS.writeFile($P, ...)
+              - pattern: $FS.writeFileSync($P, ...)
+              - pattern: $FS.unlink($P, ...)
+              - pattern: $FS.unlinkSync($P, ...)
+              - pattern: $RES.sendFile($P, ...)
+              - pattern: $RES.download($P, ...)
+          - focus-metavariable: $P
+    pattern-sanitizers:
+      - pattern: path.basename(...)
+
+  - id: sk-path-traversal-py
+    message: User input used in a file path. Use werkzeug safe_join / send_from_directory or validate the resolved path.
+    severity: ERROR
+    languages: [python]
+    metadata: { check_id: API-INJ-004, cwe: CWE-22, owasp: API8, confidence: MEDIUM }
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: request.args
+          - pattern: request.form
+          - pattern: request.json
+          - pattern: request.GET
+          - pattern: request.query_params
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: open($P, ...)
+              - pattern: send_file($P, ...)
+              - pattern: FileResponse($P, ...)
+              - pattern: os.remove($P)
+          - focus-metavariable: $P
+    pattern-sanitizers:
+      - pattern: os.path.basename(...)
+      - pattern: secure_filename(...)
+
+  # ======================================================================= SSRF
+  - id: sk-ssrf-js
+    message: >-
+      Server fetches a URL that comes from the request. Attackers can reach internal services
+      (cloud metadata, admin panels). Allow-list hosts and block private IP ranges.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-SSRF-001, cwe: CWE-918, owasp: API7, confidence: HIGH }
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: $REQ.query
+              - pattern: $REQ.body
+              - pattern: $REQ.params
+          - metavariable-regex: { metavariable: $REQ, regex: '^(req|request|ctx)$' }
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: fetch($URL, ...)
+              - pattern: axios($URL, ...)
+              - pattern: axios.$M($URL, ...)
+              - pattern: got($URL, ...)
+              - pattern: got.$M($URL, ...)
+              - pattern: http.get($URL, ...)
+              - pattern: https.get($URL, ...)
+              - pattern: http.request($URL, ...)
+              - pattern: https.request($URL, ...)
+              - pattern: request($URL, ...)
+              - pattern: needle.$M($URL, ...)
+          - focus-metavariable: $URL
+
+  - id: sk-ssrf-py
+    message: Server fetches a URL that comes from the request. Allow-list hosts and block private IP ranges.
+    severity: ERROR
+    languages: [python]
+    metadata: { check_id: API-SSRF-001, cwe: CWE-918, owasp: API7, confidence: MEDIUM }
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: request.args
+          - pattern: request.form
+          - pattern: request.json
+          - pattern: request.get_json(...)
+          - pattern: request.GET
+          - pattern: request.POST
+          - pattern: request.query_params
+          - patterns:
+              - pattern-inside: |
+                  @$APP.$METHOD(...)
+                  def $F(..., $PARAM, ...):
+                    ...
+              - pattern: $PARAM
+          - patterns:
+              - pattern-inside: |
+                  @$APP.$METHOD(...)
+                  async def $F(..., $PARAM, ...):
+                    ...
+              - pattern: $PARAM
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: requests.$M($URL, ...)
+              - pattern: httpx.$M($URL, ...)
+              - pattern: $CLIENT.get($URL, ...)
+              - pattern: urllib.request.urlopen($URL, ...)
+              - pattern: urlopen($URL, ...)
+          - focus-metavariable: $URL
+
+  - id: sk-ssrf-go
+    message: Server fetches a URL taken from the request. Allow-list hosts and block private IP ranges.
+    severity: ERROR
+    languages: [go]
+    metadata: { check_id: API-SSRF-001, cwe: CWE-918, owasp: API7, confidence: MEDIUM }
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: $R.URL.Query().Get(...)
+          - pattern: $R.FormValue(...)
+          - pattern: $C.Query(...)
+          - pattern: $C.Param(...)
+          - pattern: $C.PostForm(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: http.Get($URL)
+              - pattern: http.Post($URL, ...)
+              - pattern: http.NewRequest($M, $URL, ...)
+              - pattern: http.NewRequestWithContext($CTX, $M, $URL, ...)
+          - focus-metavariable: $URL
+
+  # ======================================================================= DATA / ERRORS
+  - id: sk-stack-trace-in-response-js
+    message: >-
+      Error stack trace sent to the client. It reveals file paths, library versions and code
+      structure. Log it server-side and return a generic message with a request ID.
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata: { check_id: API-ERR-001, cwe: CWE-209, owasp: API8, confidence: HIGH }
+    patterns:
+      - pattern-either:
+          - pattern: "$RES.$F({..., $K: $E.stack, ...})"
+          - pattern: $RES.$F($E.stack)
+          - pattern: $RES.$F(..., $E.stack, ...)
+          - pattern: "$RES.$F({..., stack: $X, ...})"
+      - metavariable-regex: { metavariable: $F, regex: '^(json|send|end|write|render|jsonp)$' }
+
+  - id: sk-stack-trace-in-response-py
+    message: Traceback returned to the client. Log it server-side and return a generic error.
+    severity: WARNING
+    languages: [python]
+    metadata: { check_id: API-ERR-001, cwe: CWE-209, owasp: API8, confidence: HIGH }
+    patterns:
+      - pattern-inside: return ...
+      - pattern-either:
+          - pattern: traceback.format_exc()
+          - pattern: traceback.format_exception(...)
+
+  - id: sk-stack-trace-config
+    message: Framework configured to include stack traces or error details in HTTP responses.
+    severity: WARNING
+    languages: [regex]
+    metadata: { check_id: API-ERR-001, cwe: CWE-209, owasp: API8, confidence: MEDIUM }
+    paths:
+      include: ["*.properties", "*.yml", "*.yaml"]
+    pattern-regex: (?i)server\.error\.include-(stacktrace|message|exception)\s*[=:]\s*(always|true)|include-stacktrace\s*:\s*always
+
+  # ======================================================================= CONFIG
+  - id: sk-cors-wildcard-credentials-js
+    message: >-
+      CORS allows any origin (or reflects the request Origin) together with credentials. Any
+      website can make authenticated requests as the logged-in user and read the response.
+      Use an explicit origin allow-list.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-CFG-001, cwe: CWE-942, owasp: API8, confidence: HIGH }
+    pattern-either:
+      - pattern: 'cors({..., origin: "*", ..., credentials: true, ...})'
+      - pattern: 'cors({..., credentials: true, ..., origin: "*", ...})'
+      - pattern: "cors({..., origin: true, ..., credentials: true, ...})"
+      - pattern: "cors({..., credentials: true, ..., origin: true, ...})"
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  $R.$S("Access-Control-Allow-Origin", $O);
+                  ...
+                  $R.$S2("Access-Control-Allow-Credentials", $C);
+              - pattern: |
+                  $R.$S2("Access-Control-Allow-Credentials", $C);
+                  ...
+                  $R.$S("Access-Control-Allow-Origin", $O);
+          - metavariable-pattern:
+              metavariable: $O
+              pattern-either:
+                - pattern: '"*"'
+                - pattern: $REQ.headers.origin
+                - pattern: $REQ.header("origin")
+                - pattern: $REQ.get("origin")
+          - metavariable-regex: { metavariable: $C, regex: '(?i).*true' }
+
+  - id: sk-cors-wildcard-credentials-py
+    message: CORS allows any origin together with credentials. Use an explicit origin allow-list.
+    severity: ERROR
+    languages: [python]
+    metadata: { check_id: API-CFG-001, cwe: CWE-942, owasp: API8, confidence: HIGH }
+    pattern-either:
+      - pattern: $APP.add_middleware(CORSMiddleware, ..., allow_origins=["*"], ..., allow_credentials=True, ...)
+      - pattern: $APP.add_middleware(CORSMiddleware, ..., allow_credentials=True, ..., allow_origins=["*"], ...)
+      - pattern: CORS($APP, ..., supports_credentials=True, ...)
+      - pattern: |
+          CORS_ALLOW_ALL_ORIGINS = True
+          ...
+          CORS_ALLOW_CREDENTIALS = True
+
+  - id: sk-cors-wildcard-credentials-other
+    message: CORS allows any origin together with credentials. Use an explicit origin allow-list.
+    severity: ERROR
+    languages: [regex]
+    metadata: { check_id: API-CFG-001, cwe: CWE-942, owasp: API8, confidence: MEDIUM }
+    paths:
+      include: ["*.java", "*.kt", "*.go"]
+    pattern-either:
+      - pattern-regex: '@CrossOrigin\([^)]*origins\s*=\s*"\*"[^)]*allowCredentials\s*=\s*"true"'
+      - pattern-regex: '(?s)AllowAllOrigins:\s*true,.{0,300}AllowCredentials:\s*true'
+      - pattern-regex: '(?s)AllowCredentials:\s*true,.{0,300}AllowAllOrigins:\s*true'
+      - pattern-regex: '(?s)AllowOrigins:\s*\[\]string\{"\*"\}.{0,300}AllowCredentials:\s*true'
+
+  - id: sk-debug-mode-py
+    message: Debug mode enabled. Debug pages leak source and settings, and the Werkzeug debugger allows code execution. Drive it from an environment variable that is off in production.
+    severity: WARNING
+    languages: [python]
+    metadata: { check_id: API-CFG-002, cwe: CWE-489, owasp: API8, confidence: MEDIUM }
+    pattern-either:
+      - pattern: $APP.run(..., debug=True, ...)
+      - pattern: FastAPI(..., debug=True, ...)
+      - pattern: $APP.debug = True
+      - pattern: $APP.config["DEBUG"] = True
+      - pattern: DEBUG = True
+
+  - id: sk-debug-mode-other
+    message: Debug / development mode enabled in code. Make sure it is off in production.
+    severity: WARNING
+    languages: [regex]
+    metadata: { check_id: API-CFG-002, cwe: CWE-489, owasp: API8, confidence: LOW }
+    paths:
+      include: ["*.js", "*.mjs", "*.cjs", "*.ts", "*.go"]
+    pattern-either:
+      - pattern-regex: gin\.SetMode\(\s*gin\.DebugMode\s*\)
+      - pattern-regex: \bapp\.use\(\s*errorhandler\(\s*\)\s*\)
+      - pattern-regex: process\.env\.NODE_ENV\s*=\s*['"]development['"]
+      - pattern-regex: \bapp\.set\(\s*['"]env['"]\s*,\s*['"]development['"]\s*\)
+      - pattern-regex: \bDEBUG\s*[:=]\s*true\b
+
+  - id: sk-tls-verify-disabled
+    message: TLS certificate verification disabled. Connections can be intercepted (MITM).
+    severity: ERROR
+    languages: [regex]
+    metadata: { check_id: API-CFG-003, cwe: CWE-295, owasp: API8, confidence: HIGH }
+    paths:
+      include: ["*.js", "*.mjs", "*.cjs", "*.ts", "*.py", "*.go", "*.java", "*.kt"]
+    pattern-either:
+      - pattern-regex: rejectUnauthorized\s*:\s*false
+      - pattern-regex: NODE_TLS_REJECT_UNAUTHORIZED[^\n]{0,10}['"]?0['"]?
+      - pattern-regex: \bverify\s*=\s*False\b
+      - pattern-regex: ssl\._create_unverified_context\(
+      - pattern-regex: \bCERT_NONE\b
+      - pattern-regex: InsecureSkipVerify\s*:\s*true
+      - pattern-regex: NoopHostnameVerifier|ALLOW_ALL_HOSTNAME_VERIFIER|TrustAllStrategy|X509TrustManager\s*\(\s*\)\s*\{
+
+  # ======================================================================= SECRETS
+  - id: sk-hardcoded-secret-js
+    message: >-
+      Secret-looking value hardcoded in source (including as an env-var fallback). Anyone with
+      repo access can use it, e.g. to forge JWTs. Load it from the environment / a secret manager,
+      fail fast if missing, and rotate it.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata: { check_id: API-SECRET-001, cwe: CWE-798, owasp: API8, confidence: MEDIUM }
+    patterns:
+      - pattern-either:
+          - pattern: $NAME = "$VALUE"
+          - pattern: '{..., $NAME: "$VALUE", ...}'
+          - pattern: process.env.$NAME || "$VALUE"
+          - pattern: process.env.$NAME ?? "$VALUE"
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i)(secret|passw(or)?d|pwd|api_?key|apikey|private_?key|access_?token|auth_?token|jwt_?(key|secret)|signing_?key|client_?secret|session_?key)
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: (?i)^(?!.*(changeme|change-me|example|placeholder|your[-_ ]|xxxx|dummy|\$\{|<)).{8,}$
+
+  - id: sk-hardcoded-secret-go-java
+    message: Secret-looking value hardcoded in source. Load it from the environment / a secret manager and rotate it.
+    severity: ERROR
+    languages: [regex]
+    metadata: { check_id: API-SECRET-001, cwe: CWE-798, owasp: API8, confidence: MEDIUM }
+    paths:
+      include: ["*.go", "*.java", "*.kt"]
+    pattern-regex: (?i)\b\w*(secret|passw(or)?d|api_?key|private_?key|access_?token|jwt_?(key|secret)|signing_?key|client_?secret)\w*\s*(:=|=)\s*"(?!(changeme|example|placeholder|your))[^"\s$<]{8,}"
+
+  - id: sk-hardcoded-secret-py
+    message: >-
+      Secret-looking value hardcoded in source (including as an env-var default). Load it from the
+      environment / a secret manager, fail fast if missing, and rotate it.
+    severity: ERROR
+    languages: [python]
+    metadata: { check_id: API-SECRET-001, cwe: CWE-798, owasp: API8, confidence: MEDIUM }
+    patterns:
+      - pattern-either:
+          - pattern: $NAME = "$VALUE"
+          - pattern: $APP.config["$NAME"] = "$VALUE"
+          - pattern: os.environ.get("$NAME", "$VALUE")
+          - pattern: os.getenv("$NAME", "$VALUE")
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i)(secret|passw(or)?d|pwd|api_?key|apikey|private_?key|access_?token|auth_?token|jwt_?(key|secret)|signing_?key|client_?secret|session_?key)
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: (?i)^(?!.*(changeme|change-me|example|placeholder|your[-_ ]|xxxx|dummy|\$\{|<)).{8,}$
+
+  - id: sk-hardcoded-jwt-key
+    message: JWT signed or verified with a hardcoded key. Load the key from the environment and rotate it.
+    severity: ERROR
+    languages: [javascript, typescript, python]
+    metadata: { check_id: API-SECRET-001, cwe: CWE-798, owasp: API8, confidence: HIGH }
+    pattern-either:
+      - pattern: jwt.sign($P, "...", ...)
+      - pattern: jwt.verify($T, "...", ...)
+      - pattern: jwt.encode($P, "...", ...)
+      - pattern: jwt.decode($T, "...", ...)
+
+  - id: sk-known-secret-formats
+    message: Credential in a well-known format committed to source. Revoke it and move it to a secret manager.
+    severity: ERROR
+    languages: [regex]
+    metadata: { check_id: API-SECRET-001, cwe: CWE-798, owasp: API8, confidence: HIGH }
+    paths:
+      include: ["*.js", "*.mjs", "*.cjs", "*.ts", "*.py", "*.go", "*.java", "*.kt", "*.rb", "*.php", "*.cs", "*.json", "*.yml", "*.yaml", "*.properties", "*.toml", "*.xml"]
+      exclude: ["package-lock.json", "yarn.lock", "pnpm-lock.yaml"]
+    pattern-either:
+      - pattern-regex: \b(AKIA|ASIA)[0-9A-Z]{16}\b
+      - pattern-regex: -----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----
+      - pattern-regex: \b(sk|rk)_live_[0-9a-zA-Z]{20,}\b
+      - pattern-regex: \bgh[pousr]_[A-Za-z0-9]{36,}\b
+      - pattern-regex: \bxox[abposr]-[A-Za-z0-9-]{10,}\b
+      - pattern-regex: \bAIza[0-9A-Za-z_-]{35}\b
+      - pattern-regex: \bsk-(proj|ant-api\d{2}|svcacct)-[A-Za-z0-9_-]{32,}
+      - pattern-regex: \bsk-[A-Za-z0-9]{48}\b
