@@ -28,8 +28,8 @@ findings or secrets to any external service.
 
 ## Locating this skill
 
-This skill's folder is the one containing this `SKILL.md`: `.claude/skills/sk-api/` or
-`.codex/skills/sk-api/` in the project. Below, `$SKILL` means that folder. Use `python3`; if that
+This skill's folder is the one containing this `SKILL.md` (e.g. `~/.claude/skills/sk-api/`,
+`~/.agents/skills/sk-api/`, or the same under the project). Below, `$SKILL` means that folder. Use `python3`; if that
 is unavailable use `python` or `py -3` (Windows).
 
 ## Arguments
