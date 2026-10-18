@@ -1,10 +1,9 @@
 'use strict';
 
-const path = require('path');
 const log = require('../log');
 const { c } = log;
-const { KIT_TARGETS, resolveProjectDir, skillsDirFor, manifestPath } = require('../paths');
-const { resolveKits } = require('../detect');
+const { KIT_TARGETS, resolveInstallRoot, skillsDirFor, manifestPath, displayPath } = require('../paths');
+const { resolveKits } = require('../kits');
 const { selectSkills } = require('../skills');
 const { readManifest, writeManifest, emptyManifest } = require('../manifest');
 const { planSync, applySync } = require('../sync');
@@ -12,41 +11,49 @@ const { printSyncResult } = require('../report');
 const { KIT_VERSION } = require('../version');
 const { UserError } = require('../errors');
 
+// Installs the skills without asking anything: for every agent, in the home folder (all projects) by default,
+// or in one project with --project / --dir.
 async function init(flags) {
-  const projectDir = resolveProjectDir(flags.dir);
-  const { kits, how } = await resolveKits(projectDir, flags.kit, { yes: flags.yes });
+  const root = resolveInstallRoot(flags);
+  const kits = resolveKits(flags.kit);
   const skills = selectSkills(flags.skills);
   if (!skills.length) throw new UserError('No skills found in this package. The download may be incomplete.');
 
-  const manifest = readManifest(projectDir) || emptyManifest(KIT_VERSION);
-  const actions = planSync({ projectDir, kits, skills, manifest, force: flags.force, removeStale: false });
+  const manifest = readManifest(root.dir) || emptyManifest(KIT_VERSION);
+  const actions = planSync({ projectDir: root.dir, kits, skills, manifest, force: flags.force, removeStale: false });
 
-  log.heading(`SecurityKit ${KIT_VERSION} → ${projectDir}`);
-  const howText = { flag: '', detected: ' (detected)', asked: '', default: ' (default)' }[how];
-  log.info(`  Agents: ${kits.map((k) => KIT_TARGETS[k].label).join(', ')}${c.gray(howText)}`);
-  log.info(`  Skills: ${skills.map((s) => s.name).join(', ')}`);
+  const where = root.scope === 'global' ? 'all projects (your home folder)' : root.dir;
+  log.heading(`SecurityKit ${KIT_VERSION} → ${where}`);
+  log.info(`  Skills: ${flags.skills ? skills.map((s) => s.name).join(', ') : `all ${skills.length} (see them with: securitykit skills)`}`);
 
   if (flags['dry-run']) {
     printSyncResult(actions, { dryRun: true });
     return 0;
   }
 
-  applySync(projectDir, actions, manifest);
+  applySync(root.dir, actions, manifest);
   const now = new Date().toISOString();
   manifest.kitVersion = KIT_VERSION;
+  manifest.scope = root.scope;
   manifest.installedAt = manifest.installedAt || now;
   manifest.updatedAt = now;
   manifest.kits = [...new Set([...manifest.kits, ...kits])].sort();
   for (const s of skills) manifest.skills[s.name] = { version: s.version || KIT_VERSION };
-  writeManifest(projectDir, manifest);
+  writeManifest(root.dir, manifest);
 
   printSyncResult(actions);
   for (const kit of kits) {
-    log.ok(`Installed into ${path.relative(projectDir, skillsDirFor(projectDir, kit)) || '.'}`);
+    log.ok(`${KIT_TARGETS[kit].label.padEnd(38)} ${displayPath(root, skillsDirFor(root.dir, kit))}`);
   }
-  log.dim(`  Manifest: ${path.relative(projectDir, manifestPath(projectDir))}`);
+  log.dim(`  Manifest: ${displayPath(root, manifestPath(root.dir))}`);
   log.heading('Next');
-  log.info(`  Open your agent in this project and run ${c.cyan('/sk-api')} (or ${c.cyan('/sk-help')} to see all commands).`);
+  if (root.scope === 'global') {
+    log.info(`  Open any project in your AI agent and run ${c.cyan('/sk-help')} to see all commands,`);
+  } else {
+    log.info(`  Open this project in your AI agent and run ${c.cyan('/sk-help')} to see all commands,`);
+  }
+  log.info(`  or start with ${c.cyan('/sk-audit')} (whole project) or ${c.cyan('/sk-review')} (your current changes).`);
+  log.dim('  Agent not listed? Point it at the .agents/skills folder, or see the README.');
   return 0;
 }
 

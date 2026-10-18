@@ -3,9 +3,9 @@
 const { UserError } = require('./errors');
 
 // Flags that take a value. Everything else starting with -- is a boolean.
-const VALUE_FLAGS = new Set(['kit', 'dir', 'skills']);
-const BOOL_FLAGS = new Set(['force', 'yes', 'help', 'version', 'json', 'dry-run']);
-const SHORT = { h: 'help', v: 'version', f: 'force', y: 'yes' };
+const VALUE_FLAGS = new Set(['kit', 'dir', 'skills', 'group']);
+const BOOL_FLAGS = new Set(['force', 'project', 'help', 'version', 'json', 'dry-run']);
+const SHORT = { h: 'help', v: 'version', f: 'force', p: 'project' };
 
 function parseArgs(argv) {
   const out = { _: [], flags: {} };

@@ -10,25 +10,34 @@ ${c.bold('Usage')}
   npx github:getsecuritykit/kit <command> [options]
 
 ${c.bold('Commands')}
-  init      Install skills into this project
+  init      Install all skills for every agent, for all your projects (no questions asked)
   update    Update installed skills; files you edited are kept and listed
+  skills    Show every skill, grouped, with a one-line description
   list      Show installed skills and versions
   doctor    Check Node, Python 3, Semgrep and skill locations
   help      Show this help
 
+${c.bold('Where skills go')}
+  Default (all projects)   ~/.claude/skills  ~/.codex/skills  ~/.agents/skills
+  --project, -p            the same folders inside the current project instead
+                           (commit them so your whole team gets the skills)
+
 ${c.bold('Options')}
-  --kit claude|codex|both   Target agent (default: detect .claude/ or .codex/, else ask)
-  --dir <path>              Project directory (default: current directory)
+  --project, -p             Install/update/list in the current project instead of your home folder
+  --dir <path>              Like --project, for another project directory
+  --kit <list>              Only some agent folders: claude, codex, agents (default: all)
   --skills sk-api,...       Install only these skills (init; sk-help is always included)
+  --group <id>              Show one group only (skills), e.g. --group ai
   --force                   Overwrite files you edited
   --dry-run                 Show what would change without writing (init, update)
-  --yes, -y                 Do not prompt; install for both agents if none detected
-  --json                    Machine-readable output (list)
+  --json                    Machine-readable output (skills, list)
   --version, -v             Print version
 
 ${c.bold('In your agent')}
-  /sk-help                  List all SecurityKit commands
-  /sk-api                   Audit API security, errors and tests
+  /sk-help                  List all SecurityKit commands, grouped
+  /sk-audit                 Audit the whole project and get one combined report
+  /sk-review                Review the current change before you merge it
+  /sk-fix                   Fix findings one by one, with your approval
 
 Docs: https://github.com/getsecuritykit/kit#readme
 `;

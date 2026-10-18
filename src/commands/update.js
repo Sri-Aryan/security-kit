@@ -1,7 +1,7 @@
 'use strict';
 
 const log = require('../log');
-const { resolveProjectDir } = require('../paths');
+const { resolveInstallRoot } = require('../paths');
 const { availableSkills } = require('../skills');
 const { readManifest, writeManifest } = require('../manifest');
 const { planSync, applySync } = require('../sync');
@@ -13,15 +13,18 @@ async function update(flags) {
   if (flags.kit || flags.skills) {
     throw new UserError(
       'update re-syncs what is already installed and does not take --kit or --skills.',
-      'To add agents or skills, run "securitykit init --kit ... --skills ..." instead.'
+      'To add skills, run "securitykit init --skills ..." instead.'
     );
   }
-  const projectDir = resolveProjectDir(flags.dir);
+  const root = resolveInstallRoot(flags);
+  const projectDir = root.dir;
   const manifest = readManifest(projectDir);
   if (!manifest) {
     throw new UserError(
-      'SecurityKit is not installed in this project (no .securitykit/manifest.json).',
-      'Run: npx github:getsecuritykit/kit init'
+      root.scope === 'global'
+        ? 'SecurityKit is not installed for your user yet (no ~/.securitykit/manifest.json).'
+        : 'SecurityKit is not installed in this project (no .securitykit/manifest.json).',
+      `Run: npx github:getsecuritykit/kit init${root.scope === 'project' ? ' --project' : ''}`
     );
   }
 

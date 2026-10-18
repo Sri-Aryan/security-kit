@@ -5,7 +5,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const log = require('../log');
 const { c } = log;
-const { KIT_TARGETS, KITS, resolveProjectDir, skillsDirFor } = require('../paths');
+const { KIT_TARGETS, KITS, resolveInstallRoot, skillsDirFor, displayPath } = require('../paths');
 const { readManifest } = require('../manifest');
 const { availableSkills } = require('../skills');
 
@@ -30,7 +30,8 @@ function findPython() {
 }
 
 async function doctor(flags) {
-  const projectDir = resolveProjectDir(flags.dir);
+  const root = resolveInstallRoot(flags);
+  const projectDir = root.dir;
   let failures = 0;
   const pass = (m) => log.ok(m);
   const fail = (m, hint) => {
@@ -62,16 +63,16 @@ async function doctor(flags) {
     else warn('bash not found', 'Skills will use scripts\\run_static.ps1 instead.');
   }
 
-  log.heading(`Project: ${projectDir}`);
+  log.heading(root.scope === 'global' ? 'Installed for all projects (home folder)' : `Project: ${projectDir}`);
   const manifest = readManifest(projectDir);
   if (!manifest) {
-    warn('SecurityKit is not installed here', 'Run: npx github:getsecuritykit/kit init');
+    warn('SecurityKit is not installed here', `Run: npx github:getsecuritykit/kit init${root.scope === 'project' ? ' --project' : ''}`);
   } else {
     pass(`Manifest found (kit ${manifest.kitVersion}, agents: ${manifest.kits.join(', ') || 'none'})`);
     for (const kit of manifest.kits) {
       for (const name of Object.keys(manifest.skills)) {
         const skillMd = path.join(skillsDirFor(projectDir, kit), name, 'SKILL.md');
-        const rel = path.relative(projectDir, skillMd);
+        const rel = displayPath(root, skillMd);
         if (fs.existsSync(skillMd)) pass(`${rel}`);
         else fail(`${rel} is missing`, 'Run: npx github:getsecuritykit/kit update --force');
       }
@@ -81,13 +82,13 @@ async function doctor(flags) {
   // Common mistake: skills copied one level too high (e.g. .claude/sk-api instead of .claude/skills/sk-api).
   const names = availableSkills().map((s) => s.name);
   for (const kit of KITS) {
-    const root = path.join(projectDir, KIT_TARGETS[kit].root);
+    const agentDir = path.join(projectDir, KIT_TARGETS[kit].root);
     for (const name of names) {
-      const misplaced = path.join(root, name);
+      const misplaced = path.join(agentDir, name);
       if (fs.existsSync(misplaced)) {
         fail(
-          `${path.relative(projectDir, misplaced)} is in the wrong place`,
-          `${KIT_TARGETS[kit].label} only loads skills from ${path.relative(projectDir, skillsDirFor(projectDir, kit))}${path.sep}. Move it or re-run init.`
+          `${displayPath(root, misplaced)} is in the wrong place`,
+          `${KIT_TARGETS[kit].label} only loads skills from ${displayPath(root, skillsDirFor(projectDir, kit))}/. Move it or re-run init.`
         );
       }
     }

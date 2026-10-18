@@ -2,7 +2,7 @@
 
 const log = require('../log');
 const { c } = log;
-const { KIT_TARGETS, resolveProjectDir, fromManifestKey } = require('../paths');
+const { KIT_TARGETS, resolveInstallRoot, fromManifestKey } = require('../paths');
 const { availableSkills } = require('../skills');
 const { readManifest } = require('../manifest');
 const { hashFileIfExists } = require('../fsutil');
@@ -23,7 +23,8 @@ function skillStatus(projectDir, manifest, kit, skillName) {
 }
 
 async function list(flags) {
-  const projectDir = resolveProjectDir(flags.dir);
+  const root = resolveInstallRoot(flags);
+  const projectDir = root.dir;
   const manifest = readManifest(projectDir);
   const shipped = availableSkills();
 
@@ -45,13 +46,14 @@ async function list(flags) {
   }
 
   if (!manifest) {
-    log.warn(`SecurityKit is not installed in ${projectDir}`);
-    log.info(`  Available skills: ${shipped.map((s) => s.name).join(', ')}`);
-    log.info('  Install with: npx github:getsecuritykit/kit init');
+    log.warn(root.scope === 'global' ? 'SecurityKit is not installed for your user yet' : `SecurityKit is not installed in ${projectDir}`);
+    log.info(`  ${shipped.length} skills available. See them grouped with: npx github:getsecuritykit/kit skills`);
+    log.info(`  Install with: npx github:getsecuritykit/kit init${root.scope === 'project' ? ' --project' : ''}`);
     return 0;
   }
 
-  log.heading(`Installed SecurityKit ${manifest.kitVersion} (updated ${manifest.updatedAt || 'unknown'})`);
+  const where = root.scope === 'global' ? 'for all projects' : `in ${projectDir}`;
+  log.heading(`Installed SecurityKit ${manifest.kitVersion} ${where} (updated ${manifest.updatedAt || 'unknown'})`);
   log.info(`  Agents: ${manifest.kits.map((k) => KIT_TARGETS[k].label).join(', ')}`);
   for (const [name, info] of Object.entries(manifest.skills).sort()) {
     const notes = [];
@@ -68,6 +70,7 @@ async function list(flags) {
   if (notInstalled.length) {
     log.dim(`\n  Not installed: ${notInstalled.map((s) => s.name).join(', ')}`);
   }
+  log.dim('  Descriptions, grouped: npx github:getsecuritykit/kit skills');
   return 0;
 }
 
