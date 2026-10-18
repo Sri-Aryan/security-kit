@@ -1,0 +1,195 @@
+"""sk-oauth2 rules."""
+
+SKILL = "sk-oauth2"
+
+MACROS = {
+    "AUTHORIZE": r"response_type\s*[=:]\s*['\"]?code\b|responseType\s*:\s*['\"]code['\"]|/oauth2?/(v\d+(\.\d+)?/)?authorize|/authorize\?|authorizationUrl\(|authorization_url\(|createAuthorizationURL\(|buildAuthorizeUrl|getAuthorizationUrl|authorizeUrl\(|create_authorization_url\(|AuthorizationCodeFlow|oauth2Client\.generateAuthUrl\(",
+    "PUBLIC_PREFIX": r"(NEXT_PUBLIC|VITE|REACT_APP|EXPO_PUBLIC|NUXT_PUBLIC|GATSBY|VUE_APP|PUBLIC)_",
+}
+
+RULES = [
+    # ------------------------------------------------------------------ GRANT
+    {
+        "id": "oauth-implicit-grant", "check_id": "OAUTH-GRANT-001", "title": "Implicit grant (tokens returned in the front channel)",
+        "files": ["code", "config", "web"],
+        "pattern": r"(?i)response_?type['\"]?\s*[=:]\s*['\"]?(token|id_token\s+token|token\s+id_token)\b|implicit(Flow|_flow|Grant|_grant)\b|\bflow\s*[:=]\s*['\"]implicit['\"]|oauth2ImplicitGrant|grant_types?['\"]?\s*[:=]\s*\[?[^\]\n]*['\"]implicit['\"]",
+        "confidence": "HIGH", "note": "Use Authorization Code + PKCE for SPAs and native apps.",
+        "examples": {"match": ["const url = `${AUTH}/authorize?response_type=token&client_id=${id}`;", "flow: 'implicit',"], "no_match": ["response_type=code&code_challenge_method=S256"]},
+    },
+    {
+        "id": "oauth-password-grant", "check_id": "OAUTH-GRANT-002", "title": "Resource Owner Password Credentials grant",
+        "files": ["code", "config"],
+        "pattern": r"(?i)grant_?type['\"]?\s*[=:]\s*['\"]?password\b|grantType\s*:\s*['\"]password['\"]|ResourceOwnerPassword\w*|password_grant|PasswordGrant\b|fetchTokenWithPassword|grant_types?['\"]?\s*[:=]\s*\[?[^\]\n]*['\"]password['\"]",
+        "confidence": "HIGH",
+        "examples": {"match": ["body: new URLSearchParams({ grant_type: 'password', username, password })"], "no_match": ["grant_type: 'authorization_code'"]},
+    },
+    # ------------------------------------------------------------------ PKCE / STATE
+    {
+        "id": "oauth-no-pkce", "check_id": "OAUTH-PKCE-001", "type": "absence", "scope": "file",
+        "title": "Authorization request without PKCE", "files": ["code"], "when": "{{AUTHORIZE}}",
+        "missing": r"(?i)(code_challenge|codeChallenge|pkce|code_verifier|codeVerifier|generate_code_verifier|S256)",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["const url = `${base}/authorize?response_type=code&client_id=${id}&state=${s}`;"], "no_match": ["const url = `${base}/authorize?response_type=code&code_challenge=${c}&code_challenge_method=S256`;"]},
+    },
+    {
+        "id": "oauth-pkce-plain", "check_id": "OAUTH-PKCE-001", "title": "PKCE 'plain' challenge method",
+        "files": ["code", "config"], "pattern": r"(?i)code_?challenge_?method['\"]?\s*[=:]\s*['\"]?plain\b", "confidence": "HIGH",
+        "examples": {"match": ["code_challenge_method: 'plain'"], "no_match": ["code_challenge_method: 'S256'"]},
+    },
+    {
+        "id": "oauth-no-state", "check_id": "OAUTH-STATE-001", "type": "absence", "scope": "file",
+        "title": "Authorization request without a state parameter", "files": ["code"], "when": "{{AUTHORIZE}}",
+        "missing": r"(?i)\bstate\b|pkce|code_challenge|nonce", "confidence": "MEDIUM",
+        "examples": {"match": ["res.redirect(`${base}/authorize?response_type=code&client_id=${id}`)"], "no_match": ["res.redirect(`${base}/authorize?response_type=code&client_id=${id}&state=${state}`)"]},
+    },
+    {
+        "id": "oauth-static-state", "check_id": "OAUTH-STATE-001", "title": "Constant state value",
+        "files": ["code"], "pattern": r"(?i)[?&]state=[\w-]{1,40}(&|['\"`])|\bstate['\"]?\s*[:=]\s*['\"][\w-]{1,40}['\"]",
+        "near": {"pattern": r"(?i)(authorize|oauth|response_type|client_id)", "lines": 3},
+        "confidence": "HIGH", "note": "state must be a fresh random value per request, bound to the user's session.",
+        "examples": {"match": ["const url = `${base}/authorize?client_id=${id}&state=xyz&response_type=code`;"], "no_match": ["const url = `${base}/authorize?client_id=${id}&state=${state}&response_type=code`;"]},
+    },
+    {
+        "id": "oauth-callback-no-state-check", "check_id": "OAUTH-STATE-001", "type": "absence", "scope": "file",
+        "title": "OAuth callback exchanges the code without verifying state",
+        "files": ["code"], "when": r"(?i)grant_type['\"]?\s*[:=]\s*['\"]?authorization_code|exchangeCodeForToken|fetch_token\(|getToken\(\s*\{?\s*code|validateAuthorizationCode\(|exchange\(\s*code",
+        "missing": r"(?i)\bstate\b\s*(!==|===|!=|==)|\bstate\b[^\n]*(compare|verify|validate|match|session)|checks\s*:\s*\[[^\]]*state|pkce|code_verifier|codeVerifier",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["app.get('/callback', async (req, res) => {\n  const t = await client.getToken({ code: req.query.code });"],
+                     "no_match": ["app.get('/callback', async (req, res) => {\n  if (req.query.state !== req.session.state) return res.sendStatus(400);\n  const t = await client.getToken({ code: req.query.code, codeVerifier });"]},
+    },
+    # ------------------------------------------------------------------ REDIR
+    {
+        "id": "oauth-redirect-uri-from-request", "check_id": "OAUTH-REDIR-001", "title": "redirect_uri built from request data",
+        "files": ["code"],
+        "pattern": r"(?i)(redirect_?uri|redirectUri|callback_?url|callbackURL)['\"]?\s*[:=]\s*[^,\n]*({{SRC}}|req\.(get\(|headers|hostname|protocol)|request\.(host|url|base_url|url_root|build_absolute_uri)|\$_SERVER)",
+        "confidence": "HIGH",
+        "examples": {"match": ["redirect_uri: `${req.protocol}://${req.get('host')}/callback`", "redirectUri: req.query.redirect_uri,"], "no_match": ["redirect_uri: config.oauth.redirectUri,"]},
+    },
+    {
+        "id": "oauth-http-redirect-uri", "check_id": "OAUTH-REDIR-001", "title": "Non-HTTPS redirect URI",
+        "files": ["code", "config", "env"],
+        "pattern": r"(?i)(redirect_?uris?|redirectUri|callback_?url|callbackURL|REDIRECT_URI)['\"]?\s*[:=]\s*\[?\s*['\"]?http://(?!localhost|127\.0\.0\.1|\[::1\])",
+        "confidence": "HIGH",
+        "examples": {"match": ["OAUTH_REDIRECT_URI=http://app.example.com/callback"], "no_match": ["OAUTH_REDIRECT_URI=http://localhost:3000/callback"]},
+    },
+    {
+        "id": "oauth-wildcard-redirect", "check_id": "OAUTH-AS-001", "title": "Wildcard or prefix redirect URI registration",
+        "files": ["code", "config"],
+        "pattern": r"(?i)(redirect_?uris?|redirectUris|allowed_?redirects?|callback_?urls?|valid_?redirect_?uris)['\"]?\s*[:=]\s*\[?[^\]\n]*\*|redirect_?uri\.startsWith\(|redirect_?uri\.(includes|indexOf)\(|redirect_uri\.startswith\(",
+        "confidence": "HIGH", "note": "Redirect URIs must be compared by exact string match.",
+        "examples": {"match": ["redirectUris: ['https://*.example.com/callback']", "if (redirect_uri.startsWith(client.baseUrl)) ok()"], "no_match": ["redirectUris: ['https://app.example.com/callback']"]},
+    },
+    {
+        "id": "oauth-open-redirect-return-url", "check_id": "OAUTH-REDIR-002", "title": "Post-login redirect to an unvalidated URL",
+        "files": ["code"],
+        "pattern": r"(res\.redirect|redirect|Redirect|RedirectResponse|HttpResponseRedirect|location\.(href|assign|replace)|window\.location)\s*\(?\s*=?\s*[^)\n]*\b(req\.(query|body|session)\.(next|returnTo|return_to|redirect\w*|continue|url|callback\w*|from)|request\.(args|GET|POST|form)(\.get\(\s*|\[)\s*['\"](next|return_to|returnTo|redirect\w*|continue|url|from)|searchParams\.get\(\s*['\"](next|returnTo|redirect\w*|url))",
+        "not_near": {"pattern": r"(?i)(is_?safe|allow_?list|allowlist|whitelist|startsWith\(\s*['\"]/['\"]|url_has_allowed_host|is_safe_url|validateRedirect|safeRedirect|sameOrigin|new URL\([^)]*\)\.origin)", "lines": 4},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["res.redirect(req.query.returnTo || '/');"], "no_match": ["res.redirect(isSafeRedirect(req.query.returnTo) ? req.query.returnTo : '/');"]},
+    },
+    {
+        "id": "oauth-multi-issuer-no-iss", "check_id": "OAUTH-MIXUP-001", "type": "absence", "scope": "project",
+        "title": "Multiple OAuth providers without issuer (iss) validation on callback",
+        "files": ["code", "config"], "when": r"(?i)(providers\s*:\s*\[[^\]]*,|GoogleProvider[\s\S]{0,400}(GitHubProvider|AzureADProvider|OktaProvider|Auth0Provider)|passport\.use\([\s\S]{0,2000}passport\.use\()",
+        "missing": r"(?i)(\biss\b|issuer)", "confidence": "LOW",
+        "examples": {"match": ["providers: [GoogleProvider({}), GitHubProvider({})]"], "no_match": ["providers: [GoogleProvider({}), GitHubProvider({})]\nchecks: ['state', 'pkce'], issuer: x"]},
+    },
+    # ------------------------------------------------------------------ OIDC
+    {
+        "id": "oauth-id-token-decoded", "check_id": "OAUTH-OIDC-001", "title": "ID token decoded without validation",
+        "files": ["code"],
+        "pattern": r"(?i)(jwt\.decode|jwt_decode|jwtDecode|decodeJwt|get_unverified_claims|ParseUnverified)\(\s*[^)\n]*id_?token|id_?token[^\n]{0,40}(jwt\.decode|jwt_decode|jwtDecode|decodeJwt)\(|JSON\.parse\(\s*(atob|Buffer\.from)\([^)\n]*id_?[tT]oken|id_?[tT]oken\.split\(['\"]\.['\"]\)\[1\]",
+        "confidence": "HIGH",
+        "examples": {"match": ["const claims = jwtDecode(tokens.id_token);", "const user = JSON.parse(atob(idToken.split('.')[1]));"], "no_match": ["const { payload } = await jwtVerify(tokens.id_token, JWKS, { issuer, audience: clientId });"]},
+    },
+    {
+        "id": "oauth-no-nonce", "check_id": "OAUTH-OIDC-001", "type": "absence", "scope": "file",
+        "title": "OpenID Connect request without a nonce", "files": ["code"],
+        "when": r"(?i)scope['\"]?\s*[:=][^\n]*\bopenid\b", "missing": r"(?i)\bnonce\b|pkce|code_challenge", "confidence": "LOW",
+        "examples": {"match": ["scope: 'openid email profile', response_type: 'code'"], "no_match": ["scope: 'openid email', nonce: generators.nonce()"]},
+    },
+    {
+        "id": "oauth-identity-by-email", "check_id": "OAUTH-OIDC-002", "title": "Provider user matched by email instead of (iss, sub)",
+        "files": ["code"],
+        "pattern": r"(?i)(find\w*|filter|where|get|first)\w*\s*\(\s*\{?\s*(where\s*:\s*\{\s*)?['\"]?email['\"]?\s*[:=]\s*(profile|claims|userinfo|user_?info|id_?token\w*|payload|token|account|oauthUser|providerUser|data)\b[\w.\[\]'\"]*email",
+        "not_near": {"pattern": r"(?i)(email_verified|emailVerified|verified_email)", "lines": 6},
+        "confidence": "MEDIUM", "note": "Emails can change or be unverified at some providers; key accounts on iss+sub.",
+        "examples": {"match": ["let user = await User.findOne({ email: profile.emails[0].value }); // profile.email"], "no_match": ["let user = await User.findOne({ provider: 'google', providerId: profile.id });"]},
+    },
+    # ------------------------------------------------------------------ TOKEN
+    {
+        "id": "oauth-token-from-fragment", "check_id": "OAUTH-TOKEN-001", "title": "Access token read from the URL",
+        "files": ["js", "web"],
+        "pattern": r"(?i)location\.hash[^\n]*(access_token|id_token)|URLSearchParams\(\s*(window\.)?location\.hash|(searchParams|query)\.get\(\s*['\"]access_token['\"]\)|[#&]access_token=",
+        "confidence": "HIGH",
+        "examples": {"match": ["const token = new URLSearchParams(window.location.hash.slice(1)).get('access_token');"], "no_match": ["const code = new URLSearchParams(window.location.search).get('code');"]},
+    },
+    {
+        "id": "oauth-token-local-storage", "check_id": "OAUTH-TOKEN-003", "title": "OAuth token stored in Web Storage",
+        "files": ["js", "web"],
+        "pattern": r"(?i)(localStorage|sessionStorage)\.setItem\(\s*['\"`][^'\"`]*(access_?token|refresh_?token|id_?token|oauth|auth_?token)|cacheLocation\s*:\s*['\"]localstorage['\"]|userStore\s*:\s*new\s+WebStorageStateStore\(\s*\{\s*store\s*:\s*window\.localStorage",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["localStorage.setItem('refresh_token', data.refresh_token);", "cacheLocation: 'localstorage',"], "no_match": ["cacheLocation: 'memory',"]},
+    },
+    {
+        "id": "oauth-broad-scopes", "check_id": "OAUTH-TOKEN-004", "title": "Broad OAuth scopes requested",
+        "files": ["code", "config"],
+        "pattern": r"(?i)scopes?['\"]?\s*[:=]\s*[\[(]?\s*['\"][^'\"]*(\*|\badmin\b|full_access|\brepo\b(?!:)|write:org|delete_repo|auth/drive(?!\.file|\.readonly)\b|auth/gmail\.modify|mail\.readwrite|https://graph\.microsoft\.com/\.default|user:email\s+repo)",
+        "confidence": "LOW",
+        "examples": {"match": ["scope: 'read:user repo',"], "no_match": ["scope: 'read:user user:email',"]},
+    },
+    # ------------------------------------------------------------------ CLIENT
+    {
+        "id": "oauth-client-secret-public-env", "check_id": "OAUTH-CLIENT-001", "title": "OAuth client secret exposed through a public env variable",
+        "files": ["any"], "pattern": r"\b{{PUBLIC_PREFIX}}\w*CLIENT_?SECRET\w*", "confidence": "HIGH",
+        "examples": {"match": ["NEXT_PUBLIC_GOOGLE_CLIENT_SECRET=abc"], "no_match": ["GOOGLE_CLIENT_SECRET=${SECRET}"]},
+    },
+    {
+        "id": "oauth-client-secret-literal", "check_id": "OAUTH-CLIENT-001", "title": "Hardcoded OAuth client secret",
+        "files": ["code", "config", "web"], "redact": 2,
+        "pattern": r"(?i)\bclient_?secret['\"]?\s*[:=]\s*['\"](?!\$\{|\{\{|<|your|xxx|changeme|example)([^'\"\s]{8,})['\"]",
+        "confidence": "HIGH",
+        "examples": {"match": ["clientSecret: 'GOCSPX-abcdef123456',"], "no_match": ["clientSecret: process.env.GOOGLE_CLIENT_SECRET,"]},
+    },
+    {
+        "id": "oauth-client-secret-in-client-code", "check_id": "OAUTH-CLIENT-001", "title": "Client secret referenced in browser or mobile code",
+        "files": ["js", "web", "kt", "java", "any"],
+        "pattern": r"(?i)client_?secret",
+        "path_includes": r"(?i)((^|/)(public|static|www|client|frontend|web|src/(components|pages|app|views|client)|pages|components|android|ios|mobile|app/src/main)/|\.(swift|dart)$)",
+        "path_excludes": r"(?i)(server|api/|functions/|backend|\.server\.|route\.(ts|js)$)",
+        "confidence": "MEDIUM", "note": "Anything shipped to browsers or devices is public; public clients use PKCE without a secret.",
+        "examples": {"match": ["const auth = new OAuth({ clientId, clientSecret: CONFIG.clientSecret });"]},
+    },
+    # ------------------------------------------------------------------ RS
+    {
+        "id": "oauth-rs-no-audience", "check_id": "OAUTH-RS-001", "type": "absence", "scope": "file",
+        "title": "Access-token validation without an audience check", "files": ["code", "config"],
+        "when": r"jwtVerify\(|jwt\.verify\(|JwtDecoder|TokenValidationParameters|AddJwtBearer|express-oauth2-jwt-bearer|express-jwt|jwks-rsa|introspect\(|token_introspection|PyJWKClient|oauth2ResourceServer",
+        "missing": r"(?i)(audience|\baud\b|ValidateAudience|withAudience|requireAudience)", "confidence": "MEDIUM",
+        "examples": {"match": ["const { payload } = await jwtVerify(token, JWKS, { issuer });"], "no_match": ["const { payload } = await jwtVerify(token, JWKS, { issuer, audience: 'orders-api' });"]},
+    },
+    {
+        "id": "oauth-rs-validation-off", "check_id": "OAUTH-RS-001", "title": "Access-token validation switched off",
+        "files": ["code", "config"],
+        "pattern": r"Validate(Issuer|Audience|Lifetime|IssuerSigningKey)\s*=\s*false|RequireSignedTokens\s*=\s*false|['\"]verify_(aud|iss|exp|signature)['\"]\s*:\s*False|ignoreExpiration\s*:\s*true",
+        "confidence": "HIGH",
+        "examples": {"match": ["ValidateAudience = false,"], "no_match": ["ValidateAudience = true,"]},
+    },
+    {
+        "id": "oauth-rs-no-scope-check", "check_id": "OAUTH-RS-002", "type": "absence", "scope": "file",
+        "title": "Token validated but no scope/permission check found", "files": ["code"],
+        "when": r"jwtVerify\(|jwt\.verify\(|auth\(\s*\{\s*audience|checkJwt|validateAccessToken|AddJwtBearer|oauth2ResourceServer",
+        "missing": r"(?i)(scope|scp\b|permissions?|roles?|requiredScopes|hasScope|hasAuthority|RequireClaim|Policy|authorize)",
+        "confidence": "LOW",
+        "examples": {"match": ["app.use(checkJwt);\napp.delete('/orders/:id', handler); // jwtVerify("], "no_match": ["app.delete('/orders/:id', checkJwt, requiredScopes('orders:delete'), handler);"]},
+    },
+    # ------------------------------------------------------------------ TLS
+    {
+        "id": "oauth-http-endpoint", "check_id": "OAUTH-TLS-001", "title": "OAuth endpoint or issuer over plain HTTP",
+        "files": ["code", "config", "env"],
+        "pattern": r"(?i)(issuer|authority|authorization_?(endpoint|url)|token_?(endpoint|url)|jwks_?(uri|url)|userinfo_?(endpoint|url)|AUTH_URL|OIDC_\w+|OAUTH_\w+URL)['\"]?\s*[:=]\s*['\"]?http://(?!localhost|127\.0\.0\.1|\[::1\]|keycloak:|host\.docker\.internal)",
+        "confidence": "HIGH",
+        "examples": {"match": ["issuer: 'http://auth.example.com',"], "no_match": ["issuer: 'https://auth.example.com',"]},
+    },
+]
