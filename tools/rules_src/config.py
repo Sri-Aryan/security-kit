@@ -1,0 +1,119 @@
+"""sk-config rules: debug modes, error detail, admin/diagnostic endpoints, default secrets, hosts, features, files."""
+
+SKILL = "sk-config"
+
+NOT_DEV = r"(?i)(^|/)(dev|development|local|test|tests|spec|example|sample|docs?)[^/]*(/|$)|\.(dev|development|local|test|example|sample)\.|settings/(dev|local|test)|development\.rb|test\.rb|\.env\.(dev|development|local|test|example|sample)"
+
+MACROS = {
+    "SECRET_VAR": r"(?:SECRET_KEY|SECRET|JWT_SECRET|JWT_KEY|SESSION_SECRET|COOKIE_SECRET|APP_KEY|APP_SECRET|SIGNING_KEY|ENCRYPTION_KEY|TOKEN_SECRET|AUTH_SECRET|NEXTAUTH_SECRET|HMAC_KEY|API_KEY|PRIVATE_KEY|secret_key|jwt_secret|session_secret|secretKey|jwtSecret|sessionSecret)",
+}
+
+RULES = [
+    # ------------------------------------------------------------------ DEBUG
+    {
+        "id": "conf-debug-flag", "check_id": "CONF-DEBUG-001", "title": "Debug mode enabled", "files": ["code", "config", "env", "docker"],
+        "pattern": r"^\s*DEBUG\s*=\s*(True|true|1|on)\b|\bapp\.run\([^)]*debug\s*=\s*True|\bapp\.debug\s*=\s*True|FLASK_DEBUG\s*[=:]\s*['\"]?(1|true)|display_errors\s*=\s*(On|1|true)|consider_all_requests_local\s*=\s*true|ASPNETCORE_ENVIRONMENT\s*[=:]\s*['\"]?Development|<compilation\s+[^>]*debug=\"true\"|customErrors\s+mode=\"Off\"|APP_DEBUG\s*=\s*true|use_debugger\s*=\s*True|spring\.devtools\.restart\.enabled\s*=\s*true|NODE_ENV\s*[=:]\s*['\"]?development",
+        "path_excludes": NOT_DEV, "confidence": "MEDIUM",
+        "note": "Confirm this file is used in production. Debug pages leak code, settings and secrets; some (Werkzeug) allow code execution.",
+        "examples": {"match": ["DEBUG = True", "app.run(host='0.0.0.0', debug=True)", "APP_DEBUG=true"],
+                     "no_match": ["DEBUG = os.environ.get('DEBUG') == '1'", "APP_DEBUG=false"]},
+    },
+    # ------------------------------------------------------------------ ERROR
+    {
+        "id": "conf-stack-trace-response", "check_id": "CONF-ERROR-001", "title": "Stack trace or raw error sent to the client", "files": ["code", "config"],
+        "pattern": r"(res\.(status\(\s*\d+\s*\)\.)?(json|send)|reply\.(code\(\s*\d+\s*\)\.)?send|ctx\.body\s*=|return\s+(jsonify|JsonResponse|Response|HttpResponse)|render\s+json:|c\.(JSON|String)\([^,]+,)\s*\(?[^\n]*\b(err|error|e|ex|exc|exception)\.(stack|stackTrace|message|backtrace|__traceback__)|traceback\.format_exc\(\)[^\n]*(return|Response|jsonify)|include-stacktrace\s*[=:]\s*['\"]?always|include-message\s*[=:]\s*['\"]?always|includeStackTrace\s*[:=]\s*true|printStackTrace\(\s*(response\.getWriter|new\s+PrintWriter\(\s*response)",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["app.use((err, req, res, next) => res.status(500).json({ error: err.stack }));", "server.error.include-stacktrace=always"],
+                     "no_match": ["app.use((err, req, res, next) => { logger.error(err); res.status(500).json({ error: 'Internal error' }); });"]},
+    },
+    {
+        "id": "conf-dev-exception-page", "check_id": "CONF-ERROR-001", "title": "Developer exception page enabled without an environment check", "files": ["cs", "code"],
+        "pattern": r"\.UseDeveloperExceptionPage\(\)", "not_near": {"pattern": r"IsDevelopment\(\)", "lines": 3}, "confidence": "HIGH",
+        "examples": {"match": ["app.UseDeveloperExceptionPage();"], "no_match": ["if (app.Environment.IsDevelopment())\n{\n    app.UseDeveloperExceptionPage();\n}"]},
+    },
+    # ------------------------------------------------------------------ ADMIN
+    {
+        "id": "conf-actuator-all", "check_id": "CONF-ADMIN-001", "title": "All Spring Boot actuator endpoints exposed", "files": ["config", "code"],
+        "pattern": r"management\.endpoints\.web\.exposure\.include\s*[=:]\s*['\"]?\*|^\s*include\s*:\s*['\"]?\*['\"]?\s*$|management\.endpoint\.(env|heapdump|shutdown)\.enabled\s*[=:]\s*true",
+        "near": {"pattern": r"management|actuator|exposure", "lines": 4}, "confidence": "HIGH",
+        "note": "/actuator/env and /heapdump leak secrets; restrict to health/info or protect them.",
+        "examples": {"match": ["management.endpoints.web.exposure.include=*", "management:\n  endpoints:\n    web:\n      exposure:\n        include: \"*\""],
+                     "no_match": ["management.endpoints.web.exposure.include=health,info"]},
+    },
+    {
+        "id": "conf-diagnostic-endpoints", "check_id": "CONF-ADMIN-001", "title": "Diagnostic/debug endpoint or console enabled", "files": ["code", "config"],
+        "pattern": r"_\s+\"net/http/pprof\"|\bphpinfo\(\s*\)|spring\.h2\.console\.enabled\s*[=:]\s*true|['\"]debug_toolbar['\"]|express-status-monitor|swaggerUi\.serve|graphiql\s*:\s*true|playground\s*:\s*true|ENABLE_SWAGGER\s*=\s*true|app\.use\(\s*['\"]/(debug|_debug|admin/debug|__debug)",
+        "path_excludes": NOT_DEV, "confidence": "MEDIUM", "note": "Fine if gated to development or behind authentication; check how production is configured.",
+        "examples": {"match": ["import _ \"net/http/pprof\"", "INSTALLED_APPS += ['debug_toolbar']"], "no_match": ["import \"net/http\""]},
+    },
+    # ------------------------------------------------------------------ DEFAULT
+    {
+        "id": "conf-fallback-secret", "check_id": "CONF-DEFAULT-001", "title": "Hardcoded fallback used when a secret env var is missing", "files": ["code", "config", "docker", "shell"],
+        "pattern": r"\b{{SECRET_VAR}}\w*['\"]?\s*\]?\s*(\|\||\?\?|\bor\b|,)\s*['\"](?!\s*['\"])[^'\"\n]{3,}['\"]|\$\{\s*{{SECRET_VAR}}\w*\s*:-[^}]{3,}\}|getenv\(\s*['\"]{{SECRET_VAR}}\w*['\"]\s*,\s*['\"][^'\"]{3,}['\"]|environ\.get\(\s*['\"]{{SECRET_VAR}}\w*['\"]\s*,\s*['\"][^'\"]{3,}['\"]",
+        "redact": True, "confidence": "HIGH",
+        "note": "If the variable is ever unset in production, everyone who has read the code knows the secret. Fail at startup instead.",
+        "examples": {"match": ["const secret = process.env.JWT_SECRET || 'dev-secret';", "SECRET_KEY = os.environ.get('SECRET_KEY', 'changeme123')", "      SESSION_SECRET: ${SESSION_SECRET:-insecure}"],
+                     "no_match": ["const secret = requireEnv('JWT_SECRET');", "SECRET_KEY = os.environ['SECRET_KEY']"]},
+    },
+    {
+        "id": "conf-placeholder-secret", "check_id": "CONF-DEFAULT-001", "title": "Framework placeholder secret left in config", "files": ["code", "config", "env"],
+        "pattern": r"SECRET_KEY\s*=\s*['\"]django-insecure-|secret_key_base\s*:\s*['\"]?[0-9a-f]{20,}|APP_KEY\s*=\s*base64:|['\"]?secret['\"]?\s*:\s*['\"](keyboard cat|secret|changeme|change-me|your-secret|mysecret|supersecret|shhhhh)['\"]",
+        "path_excludes": NOT_DEV, "redact": True, "confidence": "HIGH",
+        "examples": {"match": ["SECRET_KEY = 'django-insecure-abc123'", "app.use(session({ secret: 'keyboard cat' }));"],
+                     "no_match": ["app.use(session({ secret: process.env.SESSION_SECRET }));"]},
+    },
+    {
+        "id": "conf-default-credentials", "check_id": "CONF-DEFAULT-001", "title": "Default or trivial credentials configured", "files": ["code", "config", "env", "docker"],
+        "pattern": r"(?i)\b\w*(password|passwd|pwd|_pass)\w*['\"]?\s*[:=]\s*['\"]?(admin|root|password|changeme|123456|12345678|secret|toor|test|guest|default|letmein|qwerty|pass)['\"]?\s*,?\s*$",
+        "path_excludes": NOT_DEV, "confidence": "MEDIUM",
+        "examples": {"match": ["POSTGRES_PASSWORD=postgres123\nADMIN_PASSWORD=admin", "  password: changeme"], "no_match": ["  password: ${DB_PASSWORD}"]},
+    },
+    # ------------------------------------------------------------------ HOSTS
+    {
+        "id": "conf-allowed-hosts-wildcard", "check_id": "CONF-HOSTS-001", "title": "Any Host header accepted", "files": ["code", "config", "env"],
+        "pattern": r"ALLOWED_HOSTS\s*=\s*\[?\s*['\"]\*['\"]|\"AllowedHosts\"\s*:\s*\"\*\"|ALLOWED_HOSTS\s*=\s*\*\s*$|config\.hosts\.clear|trusted_hosts\s*=\s*\[\s*['\"]\*['\"]",
+        "path_excludes": NOT_DEV, "confidence": "MEDIUM", "note": "Enables Host-header attacks such as poisoned password-reset links and cache poisoning.",
+        "examples": {"match": ["ALLOWED_HOSTS = ['*']", "\"AllowedHosts\": \"*\""], "no_match": ["ALLOWED_HOSTS = ['app.example.com']"]},
+    },
+    # ------------------------------------------------------------------ FEATURE
+    {
+        "id": "conf-directory-listing", "check_id": "CONF-FEATURE-001", "title": "Directory listing enabled", "files": ["config", "code"],
+        "pattern": r"\bautoindex\s+on\b|Options\s+[^\n]*(\+|\s)Indexes\b|serveIndex\(|UseDirectoryBrowser\(\)|show_index\s*=\s*True|directory_listing\s*[:=]\s*true|\blisting\s*:\s*true",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["location /files/ {\n  autoindex on;\n}", "app.use('/files', serveIndex('files'));"], "no_match": ["autoindex off;"]},
+    },
+    {
+        "id": "conf-version-banner", "check_id": "CONF-FEATURE-001", "title": "Server/framework version disclosed", "files": ["config"],
+        "pattern": r"\bserver_tokens\s+on\b|ServerTokens\s+(Full|OS|Major|Minor|Min)\b|ServerSignature\s+On\b|expose_php\s*=\s*On",
+        "confidence": "LOW",
+        "examples": {"match": ["server_tokens on;", "expose_php = On"], "no_match": ["server_tokens off;"]},
+    },
+    {
+        "id": "conf-x-powered-by", "check_id": "CONF-FEATURE-001", "type": "absence", "scope": "file",
+        "title": "Express app sends X-Powered-By", "files": ["js"],
+        "when": r"\bexpress\(\s*\)", "missing": r"disable\(\s*['\"]x-powered-by['\"]|helmet|hidePoweredBy", "confidence": "LOW",
+        "examples": {"match": ["const app = express();\napp.get('/', h);"], "no_match": ["const app = express();\napp.disable('x-powered-by');"]},
+    },
+    # ------------------------------------------------------------------ FILE
+    {
+        "id": "conf-static-project-root", "check_id": "CONF-FILE-001", "title": "Static file server rooted at the project directory", "files": ["code", "config"],
+        "pattern": r"(express\.static|serveStatic|koa-static|fastify-static[^\n]*root\s*:)\(?\s*(__dirname|process\.cwd\(\)|['\"]\.\/?['\"]|path\.(join|resolve)\(\s*__dirname\s*\))\s*\)|StaticFiles\(\s*directory\s*=\s*['\"]\.['\"]|static_folder\s*=\s*['\"]\.\/?['\"]|^\s*root\s+[^;]*/(app|src|project|repo|code)\s*;",
+        "confidence": "HIGH", "note": "Serves .env, source code, .git and backups. Serve a dedicated public/ folder.",
+        "examples": {"match": ["app.use(express.static(__dirname));", "app = Flask(__name__, static_folder='.')"], "no_match": ["app.use(express.static(path.join(__dirname, 'public')));"]},
+    },
+    {
+        "id": "conf-prod-source-maps", "check_id": "CONF-FILE-001", "title": "Source maps published in production builds", "files": ["js", "config"],
+        "pattern": r"productionSourceMap\s*:\s*true|productionBrowserSourceMaps\s*:\s*true|GENERATE_SOURCEMAP\s*=\s*true|build\s*:\s*\{[^}]*sourcemap\s*:\s*true|devtool\s*:\s*['\"](source-map|eval[\w-]*|inline-source-map)['\"]",
+        "path_excludes": NOT_DEV, "confidence": "LOW", "note": "Fine if maps are uploaded privately (e.g. to an error tracker) and not served.",
+        "examples": {"match": ["module.exports = { productionBrowserSourceMaps: true };"], "no_match": ["module.exports = { productionBrowserSourceMaps: false };"]},
+    },
+    # ------------------------------------------------------------------ ENV
+    {
+        "id": "conf-no-startup-validation", "check_id": "CONF-ENV-001", "type": "absence", "scope": "project",
+        "title": "Configuration read from the environment but never validated at startup", "files": ["code"],
+        "when": r"process\.env\.\w+|os\.environ|os\.getenv|System\.getenv|os\.Getenv|ENV\[|Environment\.GetEnvironmentVariable|getenv\(",
+        "missing": r"(?i)(envalid|env-var|@t3-oss/env|znv|z\.object\([^)]*process\.env|zod[^\n]*env|BaseSettings|pydantic_settings|environs|django-environ|python-decouple|envconfig|viper|caarlos0/env|@ConfigurationProperties|@Validated|IOptions<|ValidateOnStart|dotenv-safe|requireEnv|require_env|must_?get_?env|assert\w*env|validate\w*config|config\.validate)",
+        "confidence": "LOW",
+        "examples": {"match": ["const db = process.env.DATABASE_URL;"], "no_match": ["import { cleanEnv, str } from 'envalid';\nconst env = cleanEnv(process.env, { DATABASE_URL: str() });"]},
+    },
+]
