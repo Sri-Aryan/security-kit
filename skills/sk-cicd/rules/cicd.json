@@ -1,0 +1,547 @@
+{
+  "_generated": "from tools/rules_src/cicd.py; edit the source and run tools/build_rules.py",
+  "macros": {
+    "SECRET_NAME": "(?i:[A-Za-z_]*(?:secret|token|passw(?:or)?d|pwd|api_?key|apikey|access_?key|private_?key|client_?secret|auth_?key|signing_?key|encryption_?key|credentials?)[A-Za-z_0-9]*)",
+    "PLACEHOLDER": "(?i:\\$\\{|\\{\\{|<|%\\(|process\\.env|os\\.environ|getenv|changeme|change_me|change-me|example|placeholder|your[_-]|xxx|dummy|sample|todo|redacted|\\*\\*\\*|test|fake|invalid|wrong|probe|https?://|/|\\./)"
+  },
+  "rules": [
+    {
+      "id": "cicd-prt-checkout-pr-code",
+      "check_id": "CICD-TRIG-001",
+      "title": "pull_request_target workflow checks out the PR's code",
+      "file_requires": "pull_request_target",
+      "pattern": "ref:\\s*['\\\"]?\\$\\{\\{\\s*(github\\.event\\.pull_request\\.head\\.(sha|ref)|github\\.head_ref)|refs/pull/|github\\.event\\.pull_request\\.head\\.repo\\.full_name",
+      "confidence": "HIGH",
+      "note": "pull_request_target runs with secrets and a write token; building fork code there hands both to the PR author.",
+      "examples": {
+        "match": [
+          "on: pull_request_target\njobs:\n  b:\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.event.pull_request.head.sha }}"
+        ],
+        "no_match": [
+          "on: pull_request\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.event.pull_request.head.sha }}"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-dangerous-trigger",
+      "check_id": "CICD-TRIG-001",
+      "title": "Privileged trigger (pull_request_target / workflow_run): review what it runs",
+      "pattern": "^\\s*(pull_request_target|workflow_run)\\s*:|^on:\\s*\\[?[^\\n#]*\\b(pull_request_target|workflow_run)\\b",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "on:\n  pull_request_target:\n    types: [opened]",
+          "on: [pull_request_target]"
+        ],
+        "no_match": [
+          "on: [pull_request]"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-comment-trigger-no-actor-check",
+      "check_id": "CICD-TRIG-002",
+      "title": "issue_comment trigger without an authorization check on the commenter",
+      "pattern": "^\\s*issue_comment\\s*:|^on:\\s*\\[?[^\\n#]*\\bissue_comment\\b",
+      "file_excludes": "author_association|github\\.actor\\s*==|getCollaboratorPermissionLevel|permission(_level)?\\s*==|repos/[^\\n]*/collaborators",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "on:\n  issue_comment:\n    types: [created]\njobs:\n  t:\n    if: contains(github.event.comment.body, '/deploy')"
+        ],
+        "no_match": [
+          "on:\n  issue_comment:\njobs:\n  t:\n    if: github.event.comment.author_association == 'MEMBER'"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-script-injection",
+      "check_id": "CICD-INJ-001",
+      "title": "Attacker-controlled context interpolated into a script",
+      "pattern": "^(?!\\s*-?\\s*[A-Za-z_][\\w-]*\\s*:\\s*['\\\"]?\\$\\{\\{)(?!\\s*if\\s*:).*\\$\\{\\{\\s*(github\\.event\\.(issue\\.(title|body)|pull_request\\.(title|body|head\\.ref|head\\.label|head\\.repo\\.\\w+)|comment\\.body|review\\.body|review_comment\\.body|pages\\.[^}]*page_name|commits[^}]*\\.(message|author\\.(email|name))|head_commit\\.(message|author\\.\\w+)|workflow_run\\.(head_branch|head_commit\\.\\w+|display_title)|discussion\\.(title|body)|inputs\\.\\w+)|github\\.head_ref)[^}]*\\}\\}",
+      "confidence": "HIGH",
+      "note": "Pass the value through env: (TITLE: ${{ github.event.issue.title }}) and use \"$TITLE\" in the script.",
+      "examples": {
+        "match": [
+          "      - run: echo \"Title: ${{ github.event.issue.title }}\"",
+          "          echo ${{ github.head_ref }}"
+        ],
+        "no_match": [
+          "        env:\n          TITLE: ${{ github.event.issue.title }}",
+          "    if: ${{ github.event.pull_request.title != '' }}"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-jenkins-param-interpolation",
+      "check_id": "CICD-INJ-001",
+      "title": "Build parameter interpolated into a Jenkins shell step",
+      "pattern": "\\b(sh|bat|powershell)\\s*\\(?\\s*\\\"[^\\\"]*\\$\\{?(params|env\\.CHANGE_TITLE|env\\.CHANGE_BRANCH|env\\.BRANCH_NAME)",
+      "confidence": "MEDIUM",
+      "note": "Groovy interpolates before the shell runs; use single quotes and environment variables.",
+      "examples": {
+        "match": [
+          "sh \"git checkout ${params.BRANCH}\""
+        ],
+        "no_match": [
+          "sh 'git checkout \"$BRANCH\"'"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-write-all",
+      "check_id": "CICD-PERM-001",
+      "title": "Workflow token granted write-all",
+      "pattern": "permissions\\s*:\\s*write-all",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "permissions: write-all"
+        ],
+        "no_match": [
+          "permissions: {}"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-no-permissions-block",
+      "check_id": "CICD-PERM-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "Workflow without a permissions block (inherits the default token scope)",
+      "when": "(?m)^\\s*jobs\\s*:",
+      "missing": "(?m)^\\s*permissions\\s*:",
+      "confidence": "MEDIUM",
+      "note": "Set `permissions: {}` (or contents: read) at the top and grant per job.",
+      "examples": {
+        "match": [
+          "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest"
+        ],
+        "no_match": [
+          "on: push\npermissions:\n  contents: read\njobs:\n  b: {}"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-long-lived-cloud-keys",
+      "check_id": "CICD-PERM-002",
+      "title": "Long-lived cloud credentials used in CI (prefer OIDC)",
+      "pattern": "(?i)(aws-access-key-id|AWS_ACCESS_KEY_ID|aws-secret-access-key|credentials_json|GOOGLE_(APPLICATION_)?CREDENTIALS|GCP_SA_KEY|AZURE_CREDENTIALS|ARM_CLIENT_SECRET|client-secret)\\s*:\\s*['\\\"]?\\$\\{\\{\\s*secrets\\.",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}"
+        ],
+        "no_match": [
+          "          role-to-assume: arn:aws:iam::123:role/deploy"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-unpinned-third-party-action",
+      "check_id": "CICD-DEP-001",
+      "title": "Third-party action or reusable workflow not pinned to a commit SHA",
+      "pattern": "uses:\\s*['\\\"]?(?!\\./|docker://|actions/|github/)[\\w.-]+/[\\w./-]+@(?![0-9a-f]{40}\\b)[\\w./-]+",
+      "confidence": "MEDIUM",
+      "note": "A tag can be moved to malicious code; pin the full SHA and let Dependabot/Renovate update it.",
+      "examples": {
+        "match": [
+          "      - uses: tj-actions/changed-files@v44"
+        ],
+        "no_match": [
+          "      - uses: tj-actions/changed-files@0123456789abcdef0123456789abcdef01234567 # v44"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-unpinned-first-party-action",
+      "check_id": "CICD-DEP-001",
+      "title": "GitHub-owned action pinned to a tag, not a SHA",
+      "pattern": "uses:\\s*['\\\"]?(actions|github)/[\\w./-]+@(?![0-9a-f]{40}\\b)[\\w./-]+",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "      - uses: actions/checkout@v4"
+        ],
+        "no_match": [
+          "      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-unpinned-image",
+      "check_id": "CICD-DEP-001",
+      "title": "CI job image not pinned by digest",
+      "pattern": "^\\s*(-\\s*)?image\\s*:\\s*['\\\"]?(?![^'\\\"\\s]*@sha256:)(?!\\$)[\\w./-]+(:[\\w.-]+)?['\\\"]?\\s*$",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "  image: node:20",
+          "image: python:latest"
+        ],
+        "no_match": [
+          "  image: node:20@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-orb-volatile",
+      "check_id": "CICD-DEP-001",
+      "title": "CircleCI orb pinned to a floating version",
+      "pattern": "^\\s*[\\w-]+\\s*:\\s*[\\w-]+/[\\w-]+@(volatile|\\d+|\\d+\\.\\d+)\\s*$",
+      "file_requires": "(?m)^orbs\\s*:",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "orbs:\n  node: circleci/node@5"
+        ],
+        "no_match": [
+          "orbs:\n  node: circleci/node@5.1.0"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-no-action-updates",
+      "check_id": "CICD-DEP-002",
+      "type": "absence",
+      "scope": "project",
+      "title": "No Dependabot/Renovate configuration keeping actions updated",
+      "files": [
+        "any"
+      ],
+      "when": "uses:\\s*\\S+@",
+      "missing": "github-actions|config:recommended|config:base|\\\"extends\\\"",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "      - uses: actions/checkout@v4"
+        ],
+        "no_match": [
+          "  - package-ecosystem: github-actions"
+        ]
+      },
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-lockfile-not-enforced",
+      "check_id": "CICD-DEP-003",
+      "title": "Dependency install that does not enforce the lockfile",
+      "pattern": "\\bnpm\\s+(install|i)\\b(?!\\s+-g\\b)(?![^\\n]*--global)|\\byarn(\\s+install)?\\s*$|\\byarn\\s+install\\b(?![^\\n]*--(frozen-lockfile|immutable))|\\bpnpm\\s+install\\b(?![^\\n]*--frozen-lockfile)|\\bpip3?\\s+install\\s+-r\\s+\\S+(?![^\\n]*--require-hashes)|\\bbundle\\s+install\\b(?![^\\n]*(--frozen|--deployment))",
+      "confidence": "LOW",
+      "note": "Use npm ci / yarn --immutable / pnpm --frozen-lockfile / pip --require-hashes.",
+      "examples": {
+        "match": [
+          "      - run: npm install",
+          "      - run: pip install -r requirements.txt"
+        ],
+        "no_match": [
+          "      - run: npm ci",
+          "      - run: npm install -g pnpm"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-hardcoded-secret",
+      "check_id": "CICD-SECRET-001",
+      "title": "Secret value written inline in pipeline configuration",
+      "pattern": "\\b({{SECRET_NAME}})\\s*[:=]\\s*['\\\"]?(?!\\$|{{PLACEHOLDER}})([^'\\\"\\s]{12,})",
+      "entropy": {
+        "group": 2,
+        "min": 3.4
+      },
+      "redact": 2,
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "      API_TOKEN: q8Zr2LmXv9Tn4KwPd7Ys1Hb"
+        ],
+        "no_match": [
+          "      API_TOKEN: ${{ secrets.API_TOKEN }}"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-echo-secret",
+      "check_id": "CICD-SECRET-002",
+      "title": "Pipeline prints a secret",
+      "pattern": "(?i)\\b(echo|print|printf|cat|Write-Host|Write-Output)\\b.{0,80}(\\$\\{\\{\\s*secrets\\.|\\$\\{?[A-Z_]*(TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIALS)\\b)",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "      - run: echo ${{ secrets.NPM_TOKEN }} > .npmrc && cat .npmrc"
+        ],
+        "no_match": [
+          "      - run: echo building"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-trace-env",
+      "check_id": "CICD-SECRET-002",
+      "title": "Pipeline dumps the environment or enables shell tracing",
+      "pattern": "(?i)(^|[\\s;&|:])(printenv|env|set\\s+-x|set\\s+-o\\s+xtrace|Get-ChildItem\\s+env:)\\s*($|[;&|])",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "      - run: printenv",
+          "    set -x"
+        ],
+        "no_match": [
+          "      - run: npm test"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-secrets-inherit",
+      "check_id": "CICD-SECRET-002",
+      "title": "Reusable workflow receives all secrets (secrets: inherit)",
+      "pattern": "secrets\\s*:\\s*inherit",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "    secrets: inherit"
+        ],
+        "no_match": [
+          "    secrets:\n      token: ${{ secrets.T }}"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-checkout-persist-credentials",
+      "check_id": "CICD-SECRET-002",
+      "title": "actions/checkout leaves the token in .git/config (persist-credentials not false)",
+      "pattern": "uses:\\s*['\\\"]?actions/checkout@",
+      "not_near": {
+        "pattern": "persist-credentials\\s*:\\s*false",
+        "lines": 6
+      },
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "      - uses: actions/checkout@v4\n      - run: make"
+        ],
+        "no_match": [
+          "      - uses: actions/checkout@v4\n        with:\n          persist-credentials: false"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-self-hosted-runner",
+      "check_id": "CICD-RUN-001",
+      "title": "Self-hosted runner: confirm it never runs untrusted PRs and is ephemeral",
+      "pattern": "runs-on\\s*:\\s*\\[?[^\\n]*\\bself-hosted\\b",
+      "confidence": "MEDIUM",
+      "note": "Critical if the repository is public or the workflow runs on pull_request from forks.",
+      "examples": {
+        "match": [
+          "    runs-on: [self-hosted, linux]"
+        ],
+        "no_match": [
+          "    runs-on: ubuntu-latest"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.github/(workflows/[^/]+|actions/.*action)\\.ya?ml$"
+    },
+    {
+      "id": "cicd-privileged-step",
+      "check_id": "CICD-RUN-002",
+      "title": "Privileged container or Docker socket in a pipeline step",
+      "pattern": "--privileged\\b|privileged\\s*:\\s*true|/var/run/docker\\.sock|docker:dind",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "      options: --privileged",
+          "  services:\n    - docker:dind"
+        ],
+        "no_match": [
+          "      options: --cpus 2"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-curl-pipe-shell",
+      "check_id": "CICD-RUN-003",
+      "title": "Remote script piped into a shell",
+      "pattern": "(?i)(curl|wget)\\b[^\\n|]*\\|\\s*(sudo\\s+)?(ba|z|da)?sh\\b|iex\\s*\\(\\s*(New-Object\\s+Net\\.WebClient|iwr|Invoke-WebRequest)|Invoke-Expression[^\\n]*DownloadString|\\|\\s*python3?\\s*-\\s*$",
+      "confidence": "HIGH",
+      "note": "Download, verify a checksum or signature, then execute.",
+      "examples": {
+        "match": [
+          "      - run: curl -sSL https://example.com/install.sh | bash"
+        ],
+        "no_match": [
+          "      - run: curl -sSLo install.sh https://x && sha256sum -c install.sha256"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-cache-in-release",
+      "check_id": "CICD-ART-001",
+      "title": "Cache restored in a release/publish workflow",
+      "file_requires": "(?i)(\\brelease\\b|publish|deploy|tags\\s*:)",
+      "pattern": "uses:\\s*['\\\"]?actions/cache(/restore)?@|cache\\s*:\\s*['\\\"]?(npm|yarn|pnpm|pip|poetry|gradle|maven)\\b|actions/download-artifact@",
+      "confidence": "MEDIUM",
+      "note": "Caches and artifacts written by lower-trust workflows can poison release builds.",
+      "examples": {
+        "match": [
+          "on:\n  release:\njobs:\n  p:\n    steps:\n      - uses: actions/setup-node@v4\n        with:\n          cache: npm"
+        ],
+        "no_match": [
+          "on: [push]\njobs:\n  t:\n    steps:\n      - run: npm test"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-deploy-without-approval",
+      "check_id": "CICD-DEPLOY-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "Deployment step without an approval gate or protected environment",
+      "when": "(?i)(kubectl\\s+(apply|rollout|set\\s+image)|helm\\s+(upgrade|install)|terraform\\s+apply|aws\\s+(s3\\s+sync|ecs\\s+update-service|lambda\\s+update-function|cloudformation\\s+deploy)|gcloud\\s+(run|app|functions)\\s+deploy|az\\s+(webapp|functionapp|containerapp)\\s+|vercel\\s+[^\\n]*--prod|netlify\\s+deploy\\s+[^\\n]*--prod|npm\\s+publish|twine\\s+upload|docker\\s+push|serverless\\s+deploy|fly\\s+deploy|firebase\\s+deploy|cdk\\s+deploy|pulumi\\s+up)",
+      "missing": "(?i)(environment\\s*:|when\\s*:\\s*manual|type\\s*:\\s*approval|\\binput\\s*\\{|\\bapproval\\b|ManualValidation|deployment\\s*:)",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "jobs:\n  deploy:\n    steps:\n      - run: kubectl apply -f k8s/"
+        ],
+        "no_match": [
+          "jobs:\n  deploy:\n    environment: production\n    steps:\n      - run: kubectl apply -f k8s/"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-no-security-scanning",
+      "check_id": "CICD-SCAN-001",
+      "type": "absence",
+      "scope": "project",
+      "title": "No security scanning found in any pipeline",
+      "when": ".",
+      "missing": "(?i)(codeql|semgrep|snyk|trivy|grype|gitleaks|trufflehog|zizmor|actionlint|dependency-review|npm\\s+audit|pip-audit|osv-scanner|sonar|checkov|kics|tfsec|bandit|gosec|brakeman|govulncheck|dependabot|scorecard)",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "jobs:\n  test:\n    steps:\n      - run: npm test"
+        ],
+        "no_match": [
+          "      - uses: github/codeql-action/analyze@v3"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    },
+    {
+      "id": "cicd-ai-agent-untrusted-trigger",
+      "check_id": "CICD-AI-001",
+      "title": "AI agent runs on a trigger that untrusted users control",
+      "file_requires": "\\b(issue_comment|issues|pull_request_target|pull_request_review_comment|discussion_comment)\\b",
+      "pattern": "(?i)uses:\\s*['\\\"]?[\\w.-]+/[\\w.-]*(claude|codex|copilot|openai|gpt|gemini|ai-review|aider|llm)[\\w.-]*@|ANTHROPIC_API_KEY|OPENAI_API_KEY|GEMINI_API_KEY",
+      "confidence": "MEDIUM",
+      "note": "Prompt injection in an issue or comment can make the agent use its token and tools; minimize both.",
+      "examples": {
+        "match": [
+          "on:\n  issue_comment:\njobs:\n  ai:\n    steps:\n      - uses: anthropics/claude-code-action@v1"
+        ],
+        "no_match": [
+          "on: [push]\njobs:\n  ai:\n    steps:\n      - uses: anthropics/claude-code-action@v1"
+        ]
+      },
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)(\\.github/workflows/[^/]+\\.ya?ml$|\\.github/actions/.*action\\.ya?ml$|\\.gitlab-ci\\.ya?ml$|\\.gitlab/ci/|(^|/)Jenkinsfile[^/]*$|\\.circleci/config\\.ya?ml$|azure-pipelines[^/]*\\.ya?ml$|\\.azure-pipelines/|bitbucket-pipelines\\.ya?ml$|\\.travis\\.ya?ml$|\\.buildkite/|cloudbuild[^/]*\\.ya?ml$|\\.drone\\.ya?ml$|\\.woodpecker|\\.tekton/|codebuild|buildspec\\.ya?ml$)"
+    }
+  ]
+}
