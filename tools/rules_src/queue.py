@@ -1,0 +1,82 @@
+"""sk-queue rules: broker auth, unsafe serializers, payload validation, secrets in jobs, dashboards, poison handling."""
+
+SKILL = "sk-queue"
+
+MACROS = {
+    "CONSUMER": r"\.process\(|new\s+Worker\(|@app\.task|@shared_task|@celery\.task|\.subscribe\(|\.consume\(|@KafkaListener|@RabbitListener|@SqsListener|@JmsListener|def\s+perform\(|eachMessage|\bonMessage\b|handleMessage|@Processor|IConsumer<|@job\b|@dramatiq\.actor|use\s+Oban\.Worker|implements\s+ShouldQueue|ReceiveMessage\(",
+    "ENQUEUE": r"\.add\(|\.enqueue\(|perform_async\(|perform_later\(|perform_in\(|\.delay\(|apply_async\(|send_task\(|\.publish\(|sendMessage\(|SendMessageCommand|\.produce\(|\.send\(\s*\{\s*topic|dispatch\(|BackgroundJob\.Enqueue|basic_publish\(|basicPublish\(",
+}
+
+RULES = [
+    # ------------------------------------------------------------------ AUTH
+    {
+        "id": "queue-broker-no-auth", "check_id": "QUEUE-AUTH-001", "title": "Broker connection with default, missing or plaintext credentials", "files": ["code", "config", "env", "docker"],
+        "pattern": r"amqps?://guest:guest@(?!localhost|127\.0\.0\.1)|RABBITMQ_DEFAULT_(USER|PASS)\s*[=:]\s*['\"]?guest\b|security\.protocol\s*[=:]\s*['\"]?PLAINTEXT\b|['\"]redis://(?!localhost|127\.0\.0\.1|\$\{|redis:|[^'\"@\s]*@)[^'\"/\s]+:\d+|requirepass\s+['\"]?['\"]?\s*$|protected-mode\s+no\b|nats://(?!localhost|127\.0\.0\.1|[^'\"@\s]*@)[^'\"/\s]+:\d+",
+        "path_excludes": r"(?i)(test|spec|dev|local|example|sample)", "confidence": "MEDIUM",
+        "examples": {"match": ["BROKER_URL = 'amqp://guest:guest@mq.internal:5672//'", "security.protocol=PLAINTEXT", "const q = new Queue('mail', { connection: 'redis://cache.prod.internal:6379' });"],
+                     "no_match": ["BROKER_URL = os.environ['BROKER_URL']", "security.protocol=SASL_SSL"]},
+    },
+    # ------------------------------------------------------------------ INPUT
+    {
+        "id": "queue-unsafe-serializer", "check_id": "QUEUE-INPUT-001", "title": "Unsafe message serializer (pickle / Java object messages)", "files": ["code", "config"],
+        "pattern": r"(task_serializer|result_serializer|CELERY_TASK_SERIALIZER|CELERY_RESULT_SERIALIZER|serializer)\s*=\s*['\"]pickle['\"]|accept_content\s*=\s*\[[^\]]*['\"]pickle['\"]|CELERY_ACCEPT_CONTENT\s*=\s*\[[^\]]*pickle|ObjectMessage\b|createObjectMessage\(|\.getObject\(\)|setTrustAllPackages\(\s*true\s*\)|spring\.kafka\.consumer\.properties\.spring\.json\.trusted\.packages\s*=\s*\*|JsonDeserializer\.TRUSTED_PACKAGES\s*,\s*\"\*\"|pickle\.loads\(\s*(msg|message|body|data|payload)",
+        "confidence": "HIGH", "note": "Anyone who can publish a message can run code on the worker. Use JSON + schema validation.",
+        "examples": {"match": ["app.conf.task_serializer = 'pickle'", "factory.setTrustAllPackages(true);", "spring.kafka.consumer.properties.spring.json.trusted.packages=*"],
+                     "no_match": ["app.conf.task_serializer = 'json'"]},
+    },
+    {
+        "id": "queue-consumer-no-validation", "check_id": "QUEUE-INPUT-001", "type": "absence", "scope": "file",
+        "title": "Message consumer without payload validation", "files": ["code"],
+        "when": "{{CONSUMER}}",
+        "missing": r"(?i)(zod|\.parse\(|safeParse|joi|yup|ajv|validate|pydantic|BaseModel|marshmallow|schema|@Valid|Validator|serializer\.is_valid|TypeAdapter|class-validator|plainToInstance|avro|protobuf|\.proto\b|fromBinary|decode\()",
+        "confidence": "LOW",
+        "examples": {"match": ["const worker = new Worker('emails', async (job) => {\n  await sendEmail(job.data.to, job.data.template);\n});"],
+                     "no_match": ["const worker = new Worker('emails', async (job) => {\n  const d = EmailJob.parse(job.data);\n  await sendEmail(d.to, d.template);\n});"]},
+    },
+    # ------------------------------------------------------------------ SECRET
+    {
+        "id": "queue-secret-in-payload", "check_id": "QUEUE-SECRET-001", "title": "Secret or sensitive data placed in a job/message payload", "files": ["code"],
+        "pattern": r"(?i)({{ENQUEUE}})[^\n]*\b(password|passwd|secret|token|access_?token|api_?key|apiKey|card_?number|cardNumber|cvv|ssn|private_?key)\b",
+        "confidence": "MEDIUM", "note": "Payloads persist in the broker/Redis, logs, dead-letter queues and dashboards. Pass an ID and load the secret in the worker.",
+        "examples": {"match": ["await queue.add('sync', { userId, accessToken: user.githubToken });", "SyncJob.perform_later(user.id, password)"],
+                     "no_match": ["await queue.add('sync', { userId });"]},
+    },
+    # ------------------------------------------------------------------ DASH
+    {
+        "id": "queue-dashboard-mounted", "check_id": "QUEUE-DASH-001", "title": "Job dashboard mounted without visible authentication", "files": ["code", "shell", "docker", "config"],
+        "pattern": r"(app|router)\.use\(\s*['\"][^'\"]+['\"]\s*,\s*(serverAdapter\.getRouter\(\)|\w*[Bb]oard\w*|Arena\(|bullArena)|mount\s+Sidekiq::Web\b|mount\s+Resque::Server|mount\s+GoodJob::Engine|UseHangfireDashboard\(\s*\)|celery\s+(-A\s+\S+\s+)?flower\b(?![^\n]*--basic[_-]auth)(?![^\n]*--auth)|mher/flower|Horizon::routeMailNotificationsTo",
+        "not_near": {"pattern": r"(?i)(authenticate|requireAuth|basicAuth|basic_auth|admin_?only|requireAdmin|ensureAdmin|constraints|Authorization\s*=|IDashboardAuthorizationFilter|Horizon::auth|auth\s*:)", "lines": 3},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["app.use('/admin/queues', serverAdapter.getRouter());", "mount Sidekiq::Web => '/sidekiq'"],
+                     "no_match": ["app.use('/admin/queues', requireAdmin, serverAdapter.getRouter());", "authenticate :user, ->(u) { u.admin? } do\n  mount Sidekiq::Web => '/sidekiq'\nend"]},
+    },
+    {
+        "id": "queue-mgmt-port-exposed", "check_id": "QUEUE-DASH-001", "title": "Broker management/UI port published", "files": ["docker", "config"],
+        "pattern": r"['\"]?(0\.0\.0\.0:)?(15672|8161|9000|8080|5555|8081):(15672|8161|9000|8080|5555|8081)['\"]?",
+        "near": {"pattern": r"(?i)rabbitmq|activemq|kafka-ui|kafdrop|akhq|flower|redpanda-console|redis-commander", "lines": 8}, "confidence": "LOW",
+        "examples": {"match": ["  rabbitmq:\n    image: rabbitmq:3-management\n    ports:\n      - \"15672:15672\""], "no_match": ["  rabbitmq:\n    image: rabbitmq:3\n    expose:\n      - \"5672\""]},
+    },
+    # ------------------------------------------------------------------ POISON
+    {
+        "id": "queue-no-dlq-or-retry-limit", "check_id": "QUEUE-POISON-001", "type": "absence", "scope": "project",
+        "title": "Consumers with no retry limit or dead-letter handling anywhere", "files": ["code", "config"],
+        "when": "{{CONSUMER}}",
+        "missing": r"(?i)(dead.?letter|\bdlq\b|deadLetter|max_?retries|maxRetries|\battempts\s*:|retry_?limit|max_?receive_?count|maxReceiveCount|on_?failure|sidekiq_options\s+retry|autoretry_for|retry_backoff|backoff\s*:)",
+        "confidence": "LOW",
+        "examples": {"match": ["@shared_task\ndef sync_user(user_id):\n    do_sync(user_id)"], "no_match": ["@shared_task(autoretry_for=(IOError,), max_retries=5, retry_backoff=True)\ndef sync_user(user_id):\n    do_sync(user_id)"]},
+    },
+    # ------------------------------------------------------------------ AUTHZ
+    {
+        "id": "queue-job-trusts-role", "check_id": "QUEUE-AUTHZ-001", "title": "Job payload carries a role/permission that the worker trusts", "files": ["code"],
+        "pattern": r"(?i)({{ENQUEUE}})[^\n]*\b(is_?admin|isAdmin|role|roles|permissions?|can_\w+)\s*[:=]",
+        "confidence": "LOW", "note": "Permissions can change before the job runs, and anyone who can publish can claim them. Re-check in the worker.",
+        "examples": {"match": ["await exportQueue.add('export', { userId, isAdmin: user.isAdmin });"], "no_match": ["await exportQueue.add('export', { userId });"]},
+    },
+    # ------------------------------------------------------------------ LIMIT
+    {
+        "id": "queue-enqueue-from-request", "check_id": "QUEUE-LIMIT-001", "title": "Request handler enqueues work sized by request input", "files": ["code"],
+        "pattern": r"(for|forEach|map|each)\b[^\n]*({{SRC}})[^\n]*({{ENQUEUE}})|({{SRC}})[\w.\[\]'\"]*\.(forEach|map|each)\([^\n]*({{ENQUEUE}})|({{ENQUEUE}})[^\n]*\.\.\.\s*({{SRC}})|addBulk\(\s*({{SRC}})",
+        "confidence": "LOW",
+        "examples": {"match": ["req.body.recipients.forEach((to) => mailQueue.add('send', { to }));"], "no_match": ["await mailQueue.add('campaign', { campaignId: campaign.id });"]},
+    },
+]
