@@ -15,7 +15,7 @@ Rule file format (JSON):
     "macros": {"SRC_JS": "req\\.(query|body|params)"},        # reused as {{SRC_JS}} inside patterns
     "rules": [{
       "id": "unique-id", "check_id": "XXX-YYY-001", "title": "...",
-      "files": ["js", "py"],              # groups: js py java kt go rb php cs rs scala ex code web config
+      "files": ["js", "py"],              # groups: js py java kt go rb php cs rs scala ex swift dart code web config
                                          #         env docker shell tf sql any  (or ".ext" / "Filename")
       "pattern": "regex",                # per line, unless "multiline": true (whole file)
       "flags": "i",                      # i, m, s
@@ -27,7 +27,7 @@ Rule file format (JSON):
       "redact": true | 2,                                    # mask the match (or a group) in snippets
       "type": "absence", "when": "regex", "missing": "regex", "scope": "file" | "project",
       "confidence": "HIGH" | "MEDIUM" | "LOW", "note": "...",
-      "examples": {"match": ["code..."], "no_match": ["code..."]}
+      "examples": {"match": ["code...", {"b64": "..."}], "no_match": ["code..."]}   # b64: encoded fake secrets
     }]
   }
 
@@ -37,6 +37,7 @@ Entries without a reason, or past their expiry date, are not honoured.
 """
 
 import argparse
+import base64
 import bisect
 import datetime
 import fnmatch
@@ -62,13 +63,15 @@ GROUPS = {
     "rs": {".rs"},
     "scala": {".scala"},
     "ex": {".ex", ".exs"},
+    "swift": {".swift"},
+    "dart": {".dart"},
     "web": {".html", ".htm", ".ejs", ".hbs", ".handlebars", ".jinja", ".j2", ".erb", ".twig", ".vue", ".svelte", ".jsx", ".tsx", ".cshtml", ".jsp"},
     "config": {".yml", ".yaml", ".json", ".toml", ".ini", ".cfg", ".conf", ".properties", ".xml", ".env", ".config", ".plist"},
     "shell": {".sh", ".bash", ".zsh", ".ps1", ".bat", ".cmd"},
     "tf": {".tf", ".tfvars", ".hcl"},
     "sql": {".sql"},
 }
-GROUPS["code"] = set().union(*(GROUPS[g] for g in ("js", "py", "java", "kt", "go", "rb", "php", "cs", "rs", "scala", "ex")))
+GROUPS["code"] = set().union(*(GROUPS[g] for g in ("js", "py", "java", "kt", "go", "rb", "php", "cs", "rs", "scala", "ex", "swift", "dart")))
 SPECIAL_NAMES = {
     "docker": re.compile(r"^(Dockerfile(\..*)?|.*\.dockerfile|docker-compose.*\.ya?ml|compose\.ya?ml|Containerfile)$", re.I),
     "env": re.compile(r"^\.env(\..*)?$|.*\.env$", re.I),
@@ -78,12 +81,17 @@ SKIP_DIRS = {
     "venv", "env", ".tox", ".mypy_cache", ".pytest_cache", ".securitykit", ".claude", ".codex", "coverage",
     ".idea", ".vscode", "bin", "obj", "Pods", ".gradle", ".terraform", "bower_components", "site-packages",
 }
+# Agent/editor config folders (MCP servers, tool permissions), walked only with --agent-dirs. Their installed
+# skills/plugins are third-party content (including SecurityKit's own rule examples), so those stay skipped.
+AGENT_DIRS = {".claude", ".codex", ".agents", ".cursor", ".vscode", ".gemini", ".windsurf", ".roo", ".continue", ".amazonq"}
+AGENT_SKIP = {"skills", "plugins", "commands", "agents"}
 TEST_DIRS = {"test", "tests", "__tests__", "spec", "specs", "testdata", "e2e", "fixtures", "__mocks__"}
 TEST_FILE_RE = re.compile(r"(\.(test|spec)\.[cm]?[jt]sx?$)|(^test_.*\.py$)|(_test\.(py|go)$)|(Tests?\.(java|kt|cs)$)|(_spec\.rb$)")
 MAX_BYTES = 2_000_000
 MAX_LINE = 4000
 MAX_HITS_PER_RULE = 200
-IGNORE_RE = re.compile(r"securitykit-ignore(?::\s*([A-Z]+(?:-[A-Z]+)*-\d{3}))?", re.I)
+CHECK_ID = r"[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)+-\d{3}"
+IGNORE_RE = re.compile(r"securitykit-ignore(?::\s*(" + CHECK_ID + r"))?", re.I)
 
 
 # --------------------------------------------------------------------------- rules
@@ -188,26 +196,47 @@ def file_groups(rel):
     return groups
 
 
-def walk(root, include_tests):
+def walk(root, include_tests, agent_dirs=False):
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS and not (d.startswith(".") and d not in (".github", ".gitlab", ".circleci"))
-                             and (include_tests or d not in TEST_DIRS))
+        in_agent_dir = agent_dirs and os.path.basename(dirpath) in AGENT_DIRS
+        dirnames[:] = sorted(d for d in dirnames
+                             if (agent_dirs and d in AGENT_DIRS)
+                             or (d not in SKIP_DIRS and not (d.startswith(".") and d not in (".github", ".gitlab", ".circleci"))
+                                 and (include_tests or d not in TEST_DIRS) and not (in_agent_dir and d in AGENT_SKIP)))
         for f in sorted(filenames):
             if not include_tests and TEST_FILE_RE.search(f):
                 continue
             if f.endswith((".min.js", ".map", ".lock")) or f in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml"):
                 continue
             full = os.path.join(dirpath, f)
-            try:
-                if os.path.getsize(full) > MAX_BYTES:
-                    continue
-                with open(full, "rb") as fh:
-                    data = fh.read()
-            except OSError:
-                continue
-            if b"\x00" in data[:4096]:
-                continue
-            yield os.path.relpath(full, root).replace(os.sep, "/"), data.decode("utf-8", "replace")
+            text = read_text(full)
+            if text is not None:
+                yield os.path.relpath(full, root).replace(os.sep, "/"), text
+
+
+def walk_listed(root, rel_paths):
+    """Yield (rel, text) for an explicit list of files under root, e.g. the files changed in a diff."""
+    for rel in sorted(rel_paths):
+        full = os.path.normpath(os.path.join(root, rel))
+        if not full.startswith(os.path.normpath(root) + os.sep) or not os.path.isfile(full):
+            continue
+        text = read_text(full)
+        if text is not None:
+            yield rel, text
+
+
+def read_text(full):
+    """File contents as text, or None for large, unreadable or binary files."""
+    try:
+        if os.path.getsize(full) > MAX_BYTES:
+            return None
+        with open(full, "rb") as fh:
+            data = fh.read()
+    except OSError:
+        return None
+    if b"\x00" in data[:4096]:
+        return None
+    return data.decode("utf-8", "replace")
 
 
 def git_tracked(root):
@@ -335,10 +364,15 @@ def ignored_by(entries, cand):
 
 # --------------------------------------------------------------------------- scan
 
-def scan(root, rules, include_tests=False):
+def scan(root, rules, include_tests=False, agent_dirs=False, only_files=None):
+    """only_files: set of relative paths (forward slashes) to scan instead of the whole tree (diff reviews).
+    Project-scope absence rules are skipped then: a partial file set cannot prove a control is missing."""
     root = os.path.abspath(root)
     warnings = []
-    files = list(walk(root, include_tests))
+    if only_files is None:
+        files = list(walk(root, include_tests, agent_dirs))
+    else:
+        files = list(walk_listed(root, only_files))
     tracked = git_tracked(root)
     ignores = load_ignores(root, warnings)
     cands, suppressed = [], []
@@ -379,8 +413,11 @@ def scan(root, rules, include_tests=False):
                         add(rule, rel, i, lines, m=m)
         elif rule.type == "absence":
             when_files = [(rel, text, lines) for rel, text, lines in targets if rule.when.search(text)
+                          and not (rule.file_requires and not rule.file_requires.search(text))
                           and not (rule.file_excludes and rule.file_excludes.search(text))]
             if rule.scope == "project":
+                if only_files is not None:
+                    continue
                 if when_files and not any(rule.missing.search(t) for _, t, _ in targets):
                     for rel, text, lines in when_files[:5]:
                         add(rule, rel, first_line(rule.when, text), lines, "(nothing matching the control was found anywhere in the project)")
@@ -427,9 +464,13 @@ def self_test(rules, checklist_ids=None):
         name = sample_name(rule)
         for kind in ("match", "no_match"):
             for sample in ex.get(kind, []):
+                if isinstance(sample, dict) and "b64" in sample:
+                    # Fake credentials are stored encoded so this repository does not trip secret scanners.
+                    sample = base64.b64decode(sample["b64"]).decode("utf-8")
                 checked += 1
                 if rule.type == "absence":
-                    hit = bool(rule.when.search(sample)) and not rule.missing.search(sample)
+                    hit = (bool(rule.when.search(sample)) and not rule.missing.search(sample)
+                           and not (rule.file_requires and not rule.file_requires.search(sample)))
                 else:
                     hit = bool(match_rule_in_text(rule, sample))
                 if hit != (kind == "match"):
@@ -444,6 +485,8 @@ def main(argv=None):
     ap.add_argument("--rules", action="append", help="rules file or directory (default: ../rules next to this script)")
     ap.add_argument("--out")
     ap.add_argument("--include-tests", action="store_true")
+    ap.add_argument("--agent-dirs", action="store_true", help="also walk agent/editor config folders (.claude, .cursor, .vscode, ...)")
+    ap.add_argument("--only-files", help="file listing relative paths (one per line) to scan instead of the whole tree")
     ap.add_argument("--check", action="append", default=[], help="only rules for these check IDs or prefixes (e.g. AUTH-PWD)")
     ap.add_argument("--self-test", action="store_true", help="verify every rule against its examples")
     ap.add_argument("--list", action="store_true")
@@ -467,7 +510,7 @@ def main(argv=None):
         ids = None
         if os.path.exists(checklist):
             with open(checklist, encoding="utf-8") as fh:
-                ids = set(re.findall(r"\b[A-Z]+(?:-[A-Z]+)+-\d{3}\b", fh.read()))
+                ids = set(re.findall(r"\b" + CHECK_ID + r"\b", fh.read()))
         checked, failures = self_test(rules, ids)
         for f in failures:
             print("FAIL", f)
@@ -476,7 +519,11 @@ def main(argv=None):
     if not os.path.isdir(args.root):
         print(f"error: not a directory: {args.root}", file=sys.stderr)
         return 2
-    result = scan(args.root, rules, args.include_tests)
+    only = None
+    if args.only_files:
+        with open(args.only_files, encoding="utf-8") as fh:
+            only = {ln.strip().replace("\\", "/") for ln in fh if ln.strip()}
+    result = scan(args.root, rules, args.include_tests, args.agent_dirs, only)
     text = json.dumps(result, indent=2)
     if args.out:
         os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)

@@ -268,7 +268,7 @@
   "$defs": {
     "checkId": {
       "type": "string",
-      "pattern": "^TOK-[A-Z]+-[0-9]{3}$"
+      "pattern": "^TOK-[A-Z][A-Z0-9]*-[0-9]{3}$"
     },
     "severity": {
       "enum": [

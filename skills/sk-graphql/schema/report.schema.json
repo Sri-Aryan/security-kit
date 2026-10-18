@@ -268,7 +268,7 @@
   "$defs": {
     "checkId": {
       "type": "string",
-      "pattern": "^GQL-[A-Z]+-[0-9]{3}$"
+      "pattern": "^GQL-[A-Z][A-Z0-9]*-[0-9]{3}$"
     },
     "severity": {
       "enum": [
