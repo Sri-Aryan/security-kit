@@ -1,0 +1,137 @@
+"""sk-payments rules."""
+
+SKILL = "sk-payments"
+
+MACROS = {
+    "PAY_SDK": r"(?i:stripe|paymentIntents|payment_intents|checkout\.sessions|charges\.create|paypal|braintree|adyen|razorpay|mollie|square|paddle|lemonsqueezy|createOrder|orders\.create|capture\w*\(|PaymentIntent|Checkout\.Session)",
+    "PAY_EVENT": r"payment_intent\.succeeded|checkout\.session\.completed|charge\.succeeded|invoice\.paid|invoice\.payment_succeeded|PAYMENT\.CAPTURE\.COMPLETED|CHECKOUT\.ORDER\.APPROVED|payment\.captured|order\.paid|AUTHORISATION|transaction\.completed|subscription\.(created|updated)|customer\.subscription\.\w+",
+}
+
+RULES = [
+    {
+        "id": "pay-amount-from-request", "check_id": "PAY-AMOUNT-001", "title": "Payment amount/price taken from the request",
+        "files": ["code"],
+        "pattern": r"(?i)\b(amount|unit_amount|unitAmount|price|total|value|currency)\b['\"]?\s*[:=]\s*(Number\(|parseInt\(|parseFloat\(|int\(|float\(|Math\.round\()?\s*({{SRC}})",
+        "near": {"pattern": "{{PAY_SDK}}", "lines": 8}, "confidence": "HIGH",
+        "examples": {"match": ["const pi = await stripe.paymentIntents.create({ amount: req.body.amount, currency: 'usd' });"],
+                     "no_match": ["const pi = await stripe.paymentIntents.create({ amount: order.totalCents, currency: order.currency });"]},
+    },
+    {
+        "id": "pay-price-data-from-request", "check_id": "PAY-AMOUNT-001", "title": "Checkout line items built from request data",
+        "files": ["code"], "pattern": r"(?i)(line_items|lineItems|price_data|priceData|items)\s*[:=]\s*({{SRC}})",
+        "near": {"pattern": "{{PAY_SDK}}", "lines": 8}, "confidence": "HIGH",
+        "examples": {"match": ["await stripe.checkout.sessions.create({ mode: 'payment', line_items: req.body.items });"], "no_match": ["await stripe.checkout.sessions.create({ mode: 'payment', line_items: buildItems(cart) });"]},
+    },
+    {
+        "id": "pay-status-from-url", "check_id": "PAY-CONFIRM-001", "title": "Payment status trusted from the URL/redirect",
+        "files": ["code"],
+        "pattern": r"(?i)(req\.query|request\.(args|GET|query_params)|searchParams\.get\(|URLSearchParams\([^)]*\)\.get\(|\$_GET|params\[:?)\W{0,4}(\.\s*get\(\s*)?['\"]?(status|paid|success|payment_status|paymentStatus|redirect_status|result|state)\b",
+        "near": {"pattern": r"(?i)(pay|order|checkout|stripe|paypal|fulfil|success|return)", "lines": 6}, "confidence": "HIGH",
+        "note": "Redirect parameters are user-controlled; confirm with the provider API or a verified webhook.",
+        "examples": {"match": ["app.get('/checkout/success', async (req, res) => { if (req.query.status === 'paid') await fulfil(req.query.order); })"],
+                     "no_match": ["app.get('/checkout/success', async (req, res) => { const s = await stripe.checkout.sessions.retrieve(req.query.session_id); })"]},
+    },
+    {
+        "id": "pay-client-confirms-order", "check_id": "PAY-CONFIRM-001", "title": "Client-side code marks the order as paid",
+        "files": ["js", "web"],
+        "pattern": r"(?i)(redirect_status|paymentIntent\.status|status)\s*===?\s*['\"](succeeded|paid|complete|approved|COMPLETED)['\"][^\n]{0,120}(fetch|axios|post|markPaid|confirmOrder|fulfil)",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["if (paymentIntent.status === 'succeeded') await fetch('/api/orders/mark-paid', { method: 'POST' });"], "no_match": ["if (paymentIntent.status === 'succeeded') router.push('/thanks');"]},
+    },
+    {
+        "id": "pay-webhook-unverified", "check_id": "PAY-WEBHOOK-001", "type": "absence", "scope": "file",
+        "title": "Payment webhook handler without signature verification", "files": ["code"],
+        "when": "{{PAY_EVENT}}",
+        "missing": r"(?i)(constructEvent|construct_event|verifyWebhook\w*|verify_webhook\w*|webhooks?\.verify|verifySignature|verify_signature|validateWebhook|createHmac|hmac\.|HMAC|verify-webhook-signature|Signature|unmarshal_?event)",
+        "confidence": "HIGH",
+        "examples": {"match": ["app.post('/webhook', express.json(), (req, res) => { if (req.body.type === 'checkout.session.completed') fulfil(req.body.data.object); })"],
+                     "no_match": ["const event = stripe.webhooks.constructEvent(req.body, sig, secret);\nif (event.type === 'checkout.session.completed') fulfil(event.data.object);"]},
+    },
+    {
+        "id": "pay-no-amount-match", "check_id": "PAY-MATCH-001", "type": "absence", "scope": "file",
+        "title": "Payment confirmation handled without comparing amount/currency to the order", "files": ["code"],
+        "when": "{{PAY_EVENT}}", "missing": r"(?i)(amount\w*\s*(!==|===|!=|==|<|>)|currency\s*(!==|===|!=|==)|expected_?amount|expectedAmount|amount_total\s*(!==|===|!=|==))",
+        "confidence": "LOW",
+        "examples": {"match": ["if (event.type === 'payment_intent.succeeded') await Order.update({ status: 'paid' }, { where: { id } });"],
+                     "no_match": ["if (event.type === 'payment_intent.succeeded' && pi.amount === order.totalCents && pi.currency === order.currency) markPaid(order);"]},
+    },
+    {
+        "id": "pay-no-idempotency-key", "check_id": "PAY-IDEM-001", "type": "absence", "scope": "file",
+        "title": "Provider create/charge/refund calls without idempotency keys", "files": ["code"],
+        "when": r"(paymentIntents|charges|refunds|transfers|payouts|checkout\.sessions|subscriptions)\.create\(|PaymentIntent\.create\(|Refund\.create\(|Charge\.create\(",
+        "missing": r"(?i)(idempotencyKey|idempotency_key|Idempotency-Key)", "confidence": "MEDIUM",
+        "examples": {"match": ["await stripe.refunds.create({ payment_intent: pi });"], "no_match": ["await stripe.refunds.create({ payment_intent: pi }, { idempotencyKey: `refund-${orderId}` });"]},
+    },
+    {
+        "id": "pay-no-event-dedupe", "check_id": "PAY-IDEM-001", "type": "absence", "scope": "file",
+        "title": "Payment events processed without duplicate-event protection", "files": ["code"],
+        "when": "{{PAY_EVENT}}", "missing": r"(?i)(event\.id|event_id|eventId|processed|dedup|idempot|already|ON\s+CONFLICT|unique)",
+        "confidence": "MEDIUM", "note": "Providers redeliver events; fulfilment must happen once per event/order.",
+        "examples": {"match": ["if (event.type === 'checkout.session.completed') await ship(event.data.object.metadata.orderId);"],
+                     "no_match": ["if (await Processed.exists(event.id)) return;\nif (event.type === 'checkout.session.completed') await ship(orderId);"]},
+    },
+    {
+        "id": "pay-refund-amount-from-request", "check_id": "PAY-REFUND-001", "title": "Refund amount taken from the request",
+        "files": ["code"],
+        "pattern": r"(refunds\.create\(|\.refund\(|Refund\.create\(|createRefund\(|refund_payment\(|issueRefund\()[^\n]*",
+        "near": {"pattern": "{{SRC}}", "lines": 3}, "confidence": "HIGH",
+        "examples": {"match": ["await stripe.refunds.create({ payment_intent: order.pi, amount: req.body.amount });"], "no_match": ["await stripe.refunds.create({ payment_intent: order.pi, amount: refundableCents(order) });"]},
+    },
+    {
+        "id": "pay-plan-from-request", "check_id": "PAY-SUB-001", "title": "Plan/premium entitlement taken from the request",
+        "files": ["code"],
+        "pattern": r"(?i)\b(plan|tier|subscription|is_?premium|isPremium|is_?pro|isPro|entitlements?|credits|seats)\b['\"]?\s*[:=]\s*({{SRC}})",
+        "confidence": "HIGH",
+        "examples": {"match": ["user.plan = req.body.plan; await user.save();"], "no_match": ["user.plan = planFromPrice(subscription.items.data[0].price.id);"]},
+    },
+    {
+        "id": "pay-secret-key-client", "check_id": "PAY-KEY-001", "title": "Payment secret key exposed to client code",
+        "files": ["any"],
+        "pattern": r"\b(NEXT_PUBLIC|VITE|REACT_APP|EXPO_PUBLIC|NUXT_PUBLIC|GATSBY|VUE_APP|PUBLIC)_\w*(STRIPE|PAYPAL|BRAINTREE|ADYEN|RAZORPAY|SQUARE|PADDLE|MOLLIE)\w*(SECRET|PRIVATE|_SK\b|ACCESS_TOKEN|API_KEY)\w*|Stripe\(\s*['\"]sk_",
+        "confidence": "HIGH",
+        "examples": {"match": ["NEXT_PUBLIC_STRIPE_SECRET_KEY=x"], "no_match": ["NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=x"]},
+    },
+    {
+        "id": "pay-secret-key-literal", "check_id": "PAY-KEY-001", "title": "Hardcoded payment provider key", "files": ["code", "config"],
+        "pattern": r"(?i)(stripe|paypal|braintree|adyen|razorpay|square|paddle|mollie)\w*(secret|private|api|access)_?\w*['\"]?\s*[:=(]\s*['\"](?!\$\{|\{\{|<|your|xxx|changeme|example)([^'\"\s]{12,})['\"]",
+        "redact": 3, "confidence": "HIGH",
+        "examples": {"match": ["const stripeSecretKey = 'rk_live_51HxYzAbCdEfGhIj';"], "no_match": ["const stripeSecretKey = process.env.STRIPE_SECRET_KEY;"]},
+    },
+    {
+        "id": "pay-raw-card-data", "check_id": "PAY-PCI-001", "title": "Raw card number/CVV handled by the server",
+        "files": ["code"],
+        "pattern": r"({{SRC}})\W{0,4}(\.\s*get\(\s*)?['\"]?(card_?number|cardNumber|card_?no|pan|cvv|cvc|cvv2|card_?cvc|cardCvc|security_?code|securityCode)\b|\{[^}]*\b(card_?number|cardNumber|cvv|cvc|cvv2|cardCvc|securityCode)\b[^}]*\}\s*=\s*({{SRC}})",
+        "confidence": "HIGH", "note": "Use hosted payment fields so card data goes straight to the provider (keeps you out of most PCI scope).",
+        "examples": {"match": ["const { cardNumber, cvv } = req.body;", "pan = request.form['card_number']"], "no_match": ["const { paymentMethodId } = req.body;"]},
+    },
+    {
+        "id": "pay-card-form-fields", "check_id": "PAY-PCI-001", "title": "Card number/CVV collected in your own form fields",
+        "files": ["web", "js"],
+        "pattern": r"(?i)name=[\"'](card_?number|cardnumber|cc_?number|ccnum|cvv|cvc|cvv2|card_?cvc|security_?code)[\"']|autocomplete=[\"']cc-(number|csc)[\"']",
+        "confidence": "MEDIUM", "note": "Fine only if these fields are rendered by the provider (iframe/Elements), not posted to your server.",
+        "examples": {"match": ["<input name=\"card_number\" autocomplete=\"cc-number\">"], "no_match": ["<div id=\"card-element\"></div>"]},
+    },
+    {
+        "id": "pay-store-cvv", "check_id": "PAY-PCI-001", "title": "CVV/PAN persisted or logged",
+        "files": ["code"],
+        "pattern": r"(?i)\b(cvv|cvc|cvv2|card_?number|cardNumber|pan)\b['\"]?\s*[:=][^\n]*",
+        "near": {"pattern": r"(?i)(save|create|insert|update|store|log|console|logger|print)", "lines": 2},
+        "not_near": {"pattern": r"(?i)(mask|last4|last_four|redact|\*\*\*\*)", "lines": 1},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["await Card.create({ userId, cardNumber: body.cardNumber, cvv: body.cvv });"], "no_match": ["await Card.create({ userId, last4: pm.card.last4, brand: pm.card.brand });"]},
+    },
+    {
+        "id": "pay-no-attempt-limit", "check_id": "PAY-FRAUD-001", "type": "absence", "scope": "project",
+        "title": "Payment attempts not rate-limited anywhere (card testing)", "files": ["code", "config"],
+        "when": r"(paymentIntents|charges|setupIntents|checkout\.sessions)\.create\(|PaymentIntent\.create\(|['\"`][^'\"`\s]*/(pay|checkout|payments?|charge)['\"`]",
+        "missing": "{{RATE_LIMIT}}|(?i:captcha|turnstile|radar|fraud|risk_?score|velocity)", "confidence": "LOW",
+        "examples": {"match": ["router.post('/checkout', createCheckout)"], "no_match": ["router.post('/checkout', paymentLimiter, createCheckout)"]},
+    },
+    {
+        "id": "pay-log-payload", "check_id": "PAY-LOG-001", "title": "Payment payload or event body logged",
+        "files": ["code"],
+        "pattern": r"(?i){{LOG_CALL}}.{0,80}\b(event|payload|body|paymentIntent|payment_intent|charge|card|session|req\.body|request\.(json|data))\b\s*[,)+}]",
+        "near": {"pattern": "{{PAY_SDK}}|{{PAY_EVENT}}", "lines": 6}, "confidence": "LOW",
+        "examples": {"match": ["const event = stripe.webhooks.constructEvent(b, s, k);\nconsole.log('stripe event', event);"], "no_match": ["const event = stripe.webhooks.constructEvent(b, s, k);\nlogger.info('stripe event %s %s', event.id, event.type);"]},
+    },
+]
