@@ -1,0 +1,269 @@
+{
+  "_generated": "from tools/rules_src/ssrf.py; edit the source and run tools/build_rules.py",
+  "macros": {
+    "SRC_JS": "\\breq\\.(query|body|params|headers|cookies)|\\brequest\\.(query|body|params)|\\bctx\\.(query|params|request\\.body)|\\bevent\\.(body|queryStringParameters|pathParameters)|searchParams\\.get\\(",
+    "SRC_PY": "\\brequest\\.(args|form|json|values|data|GET|POST|query_params|get_json|files|headers|cookies|path_params|view_args)|\\bself\\.request\\b",
+    "SRC_JAVA": "@RequestParam|@PathVariable|@RequestBody|\\.getParameter\\(|\\.getHeader\\(|\\.getQueryString\\(",
+    "SRC_GO": "\\.URL\\.Query\\(\\)|\\.FormValue\\(|\\.PostFormValue\\(|\\bc\\.(Query|Param|PostForm|DefaultQuery|GetHeader)\\(|mux\\.Vars\\(|chi\\.URLParam\\(",
+    "SRC_PHP": "\\$_(GET|POST|REQUEST|COOKIE|SERVER|FILES)\\b|\\$request->(input|get|query|post)\\(",
+    "SRC_RB": "\\bparams\\[|\\brequest\\.(params|body|headers)",
+    "SRC_CS": "\\bRequest\\.(Query|Form|Headers|Cookies)\\b|\\[From(Query|Body|Route|Form|Header)\\]",
+    "SRC": "{{SRC_JS}}|{{SRC_PY}}|{{SRC_JAVA}}|{{SRC_GO}}|{{SRC_PHP}}|{{SRC_RB}}|{{SRC_CS}}",
+    "FETCH": "\\bfetch\\(|\\baxios(\\.(get|post|put|request|head))?\\(|\\bgot(\\.\\w+)?\\(|\\bneedle\\(|\\bsuperagent|\\brequest(\\.get)?\\(|https?\\.(get|request)\\(|undici\\.(request|fetch)|requests\\.(get|post|put|head|request)\\(|httpx\\.(get|post|request|stream|AsyncClient|Client)|urllib\\.request\\.urlopen\\(|\\burlopen\\(|aiohttp\\.ClientSession|http\\.(Get|Post|Head|NewRequest)\\(|\\bresty\\.|RestTemplate\\b|WebClient\\b|HttpClient\\b|HttpURLConnection|new\\s+URL\\([^)]*\\)\\.openConnection|OkHttpClient|Net::HTTP|open-uri|URI\\.open|Faraday|HTTParty|curl_exec|file_get_contents\\(\\s*\\$|Guzzle",
+    "URLISH": "(?i:url|uri|link|href|endpoint|target|dest\\w*|host|domain|callback|webhook|image|avatar|feed|site|redirect|src|source|remote|proxy)",
+    "SSRF_GUARD": "(?i:is_?private|isPrivate|is_loopback|isLoopback|is_link_local|isLinkLocal|ipaddress\\.|ip_address\\(|net\\.ParseIP|IsPrivate\\(\\)|IsLoopback|InetAddress|private[_ ]?ip|ssrf|169\\.254\\.169\\.254|blocklist|denylist|allowlist|allowed_?hosts|ALLOWED_\\w*HOSTS|dns\\.lookup|getaddrinfo|LookupIP|resolve4|request-filtering-agent|ssrf-req-filter|safe_?url|validate_?url|is_?public_?url|isPublicUrl|ipaddr)"
+  },
+  "rules": [
+    {
+      "id": "ssrf-fetch-request-url",
+      "check_id": "SSRF-INPUT-001",
+      "title": "Server fetches a URL taken from the request",
+      "files": [
+        "code"
+      ],
+      "pattern": "({{FETCH}})\\s*\\(?\\s*[^)\\n]*({{SRC}})",
+      "not_near": {
+        "pattern": "{{SSRF_GUARD}}",
+        "lines": 6
+      },
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "const r = await fetch(req.query.url);",
+          "resp = requests.get(request.args['url'], timeout=5)"
+        ],
+        "no_match": [
+          "const r = await fetch(`${API_BASE}/items`);"
+        ]
+      }
+    },
+    {
+      "id": "ssrf-fetch-urlish-var",
+      "check_id": "SSRF-INPUT-001",
+      "title": "Server fetch of a URL-like variable (trace its origin)",
+      "files": [
+        "code"
+      ],
+      "pattern": "({{FETCH}})\\s*\\(?\\s*[\\w.]*{{URLISH}}\\w*\\b",
+      "not_near": {
+        "pattern": "{{SSRF_GUARD}}|(?i:process\\.env|config\\.|settings\\.|API_BASE|BASE_URL)",
+        "lines": 4
+      },
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "const res = await axios.get(user.avatarUrl);"
+        ],
+        "no_match": [
+          "const res = await axios.get(config.apiUrl);"
+        ]
+      }
+    },
+    {
+      "id": "ssrf-string-validation",
+      "check_id": "SSRF-PARSE-001",
+      "title": "URL validated with string/regex checks on the raw value",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\b\\w*(url|uri|link|host|domain)\\w*\\s*\\.\\s*(startsWith|startswith|endsWith|endswith|includes|indexOf|contains|match)\\(\\s*['\\\"`/]|re\\.(match|search)\\([^)]*(url|host)|(url|host)\\w*\\s+=~\\s*/",
+      "near": {
+        "pattern": "{{FETCH}}|(?i:allow|valid|trusted|whitelist|safe)",
+        "lines": 6
+      },
+      "confidence": "MEDIUM",
+      "note": "`https://trusted.com@evil.com`, `https://trusted.com.evil.com`, `https://evil.com/?x=trusted.com` all pass such checks.",
+      "examples": {
+        "match": [
+          "if (!url.startsWith('https://images.example.com')) return res.sendStatus(400);\nconst r = await fetch(url);"
+        ],
+        "no_match": [
+          "const u = new URL(url);\nif (!ALLOWED_HOSTS.has(u.hostname)) return res.sendStatus(400);\nconst r = await fetch(u);"
+        ]
+      }
+    },
+    {
+      "id": "ssrf-no-ip-check",
+      "check_id": "SSRF-IP-001",
+      "type": "absence",
+      "scope": "project",
+      "title": "User-influenced fetches but no private-IP / allow-list validation anywhere",
+      "files": [
+        "code"
+      ],
+      "when": "({{FETCH}})\\s*\\(?\\s*[^)\\n]*({{SRC}})",
+      "missing": "{{SSRF_GUARD}}",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "const r = await fetch(req.body.url);"
+        ],
+        "no_match": [
+          "await assertPublicUrl(req.body.url); // ssrf guard\nconst r = await fetch(req.body.url);"
+        ]
+      }
+    },
+    {
+      "id": "ssrf-hostname-check-then-fetch",
+      "check_id": "SSRF-DNS-001",
+      "title": "Host resolved/validated, then fetched by name (DNS rebinding window)",
+      "files": [
+        "code"
+      ],
+      "pattern": "(dns\\.(promises\\.)?lookup|dns\\.resolve\\w*|socket\\.gethostbyname|getaddrinfo|net\\.LookupIP|InetAddress\\.getByName|Dns\\.GetHostAddresses)\\(",
+      "near": {
+        "pattern": "{{FETCH}}",
+        "lines": 10
+      },
+      "not_near": {
+        "pattern": "(?i)(lookup\\s*:|createConnection|agent|ssrf-req-filter|request-filtering-agent|pinned|connect\\([^)]*ip|resolved_?ip|DialContext|socket_options)",
+        "lines": 10
+      },
+      "confidence": "MEDIUM",
+      "note": "The HTTP client resolves the name again; an attacker's DNS can answer a public IP first and 127.0.0.1 second.",
+      "examples": {
+        "match": [
+          "const { address } = await dns.promises.lookup(u.hostname);\nif (isPrivate(address)) throw e;\nconst r = await fetch(u);"
+        ],
+        "no_match": [
+          "const agent = new RequestFilteringHttpAgent();\nconst r = await fetch(u, { agent });"
+        ]
+      }
+    },
+    {
+      "id": "ssrf-redirects-followed",
+      "check_id": "SSRF-REDIR-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "User-influenced fetch with redirects followed (default)",
+      "files": [
+        "code"
+      ],
+      "when": "({{FETCH}})\\s*\\(?\\s*[^)\\n]*({{SRC}}|{{URLISH}})",
+      "missing": "(?i)(maxRedirects\\s*:\\s*0|allow_redirects\\s*=\\s*False|redirect\\s*:\\s*['\\\"](manual|error)|follow_redirects\\s*=\\s*False|CheckRedirect|followRedirects\\s*\\(\\s*false|setInstanceFollowRedirects\\s*\\(\\s*false|Redirect\\.NEVER|followRedirects?\\s*:\\s*false|AllowAutoRedirect\\s*=\\s*false|max_redirects\\s*=\\s*0)",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const r = await axios.get(req.query.url);"
+        ],
+        "no_match": [
+          "const r = await axios.get(req.query.url, { maxRedirects: 0 });"
+        ]
+      }
+    },
+    {
+      "id": "ssrf-scheme-unchecked",
+      "check_id": "SSRF-SCHEME-001",
+      "title": "Fetcher that supports non-HTTP schemes used with a dynamic URL",
+      "files": [
+        "code"
+      ],
+      "pattern": "(urllib\\.request\\.urlopen|urlopen|urllib2\\.urlopen|file_get_contents|curl_init|curl_setopt\\([^,]*CURLOPT_URL|URI\\.open|open-uri|Kernel\\.open|new\\s+URL\\([^)]*\\)\\.openStream|url\\.openConnection\\(\\))\\s*\\(?\\s*[^)\\n]*[\\w$]",
+      "not_near": {
+        "pattern": "(?i)(scheme\\s*(not\\s+)?in|scheme\\s*[!=]==?|protocol\\s*[!=]==?|CURLOPT_PROTOCOLS|startswith\\(\\s*\\(?['\\\"]https?|https?:)",
+        "lines": 4
+      },
+      "confidence": "MEDIUM",
+      "note": "These clients accept file://, ftp://, gopher:// and more; enforce http/https on the parsed URL.",
+      "examples": {
+        "match": [
+          "data = urllib.request.urlopen(target).read()",
+          "$html = file_get_contents($_GET['u']);"
+        ],
+        "no_match": [
+          "if urlparse(target).scheme not in ('http', 'https'): abort(400)\ndata = urllib.request.urlopen(target).read()"
+        ]
+      }
+    },
+    {
+      "id": "ssrf-response-returned",
+      "check_id": "SSRF-RESP-001",
+      "title": "Fetched response body returned to the user",
+      "files": [
+        "code"
+      ],
+      "pattern": "(res\\.(send|json|write|end)|return\\s+[^\\n]*(Response|jsonify|JSONResponse|HttpResponse)|c\\.(String|Data|JSON)|w\\.Write)\\s*\\(?\\s*[^)\\n]*\\b(response|resp|r|res|upstream|fetched|data)\\.(text|body|data|content|json\\(\\))",
+      "near": {
+        "pattern": "{{FETCH}}",
+        "lines": 6
+      },
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "const r = await fetch(req.query.url);\nres.send(await r.text());"
+        ],
+        "no_match": [
+          "const r = await fetch(api);\nres.json({ ok: r.ok });"
+        ]
+      }
+    },
+    {
+      "id": "ssrf-no-timeout",
+      "check_id": "SSRF-RESP-001",
+      "title": "User-influenced fetch without a timeout",
+      "files": [
+        "code"
+      ],
+      "pattern": "({{FETCH}})\\s*\\(?\\s*[^)\\n]*({{SRC}})",
+      "not_near": {
+        "pattern": "(?i)(timeout|AbortSignal|signal\\s*:|deadline|WithTimeout|setTimeout)",
+        "lines": 3
+      },
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "const r = await fetch(req.body.url);"
+        ],
+        "no_match": [
+          "const r = await fetch(req.body.url, { signal: AbortSignal.timeout(5000) });"
+        ]
+      }
+    },
+    {
+      "id": "ssrf-imds-v1",
+      "check_id": "SSRF-META-001",
+      "title": "Instance metadata v1 allowed / hop limit too high",
+      "files": [
+        "tf",
+        "config",
+        "any"
+      ],
+      "pattern": "(?i)http_tokens\\s*=\\s*\\\"optional\\\"|HttpTokens\\s*[:=]\\s*['\\\"]?optional|http_put_response_hop_limit\\s*=\\s*([2-9]|\\d{2})",
+      "path_excludes": "(?i)\\.md$",
+      "confidence": "MEDIUM",
+      "note": "Require IMDSv2 (http_tokens = required) with hop limit 1 so SSRF cannot read cloud credentials.",
+      "examples": {
+        "match": [
+          "metadata_options {\n  http_tokens = \"optional\"\n}"
+        ],
+        "no_match": [
+          "metadata_options {\n  http_tokens = \"required\"\n  http_put_response_hop_limit = 1\n}"
+        ]
+      }
+    },
+    {
+      "id": "ssrf-headless-renderer",
+      "check_id": "SSRF-RENDER-001",
+      "title": "Headless browser/renderer loads user-supplied URL or HTML",
+      "files": [
+        "code"
+      ],
+      "pattern": "(page\\.goto|page\\.setContent|\\.newPage\\(|wkhtmltopdf|pdfkit\\.from_(url|string)|HTML\\(\\s*(string|url)\\s*=|weasyprint|puppeteer|playwright|chromium\\.launch|html-pdf|phantom|PdfRenderer|Prince|gotenberg)\\b[^\\n]*",
+      "near": {
+        "pattern": "{{SRC}}",
+        "lines": 3
+      },
+      "confidence": "MEDIUM",
+      "note": "Renderers fetch every resource in the HTML (img, iframe, link): isolate them and block internal networks.",
+      "examples": {
+        "match": [
+          "await page.goto(req.query.url);",
+          "pdf = HTML(string=request.form['html']).write_pdf()"
+        ],
+        "no_match": [
+          "await page.goto(`${APP_URL}/invoice/${id}`);"
+        ]
+      }
+    }
+  ]
+}
