@@ -1,8 +1,30 @@
 node_modules/
 .claude/settings.local.json
+
+# python
 __pycache__/
 *.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# os / editors
 .DS_Store
-# reports written when running the kit against the example app
-examples/**/security-report.md
-examples/**/.securitykit/
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+
+# logs and npm pack output
+*.log
+npm-debug.log*
+*.tgz
+
+# reports written when running the kit (against the example app or this repo)
+security-report*.md
+.securitykit/
+
+.env
+.env.*
+!.env.example
