@@ -1,0 +1,166 @@
+"""sk-rag rules."""
+
+SKILL = "sk-rag"
+
+MACROS = {
+    "VECTOR_QUERY": r"similarity_search\w*\(|similaritySearch\w*\(|max_marginal_relevance_search\w*\(|maxMarginalRelevanceSearch\(|\.as_retriever\(|\.asRetriever\(|\.query_points\(|\bindex\.query\(|\.vectorSearch\(|['\"]\$vectorSearch['\"]|\bnearText\b|\bnearVector\b|\.hybrid_search\(|\.query\(\s*(query_embeddings|queryEmbeddings|query_texts|queryTexts|vector\s*=|vector:)|<=>|<->|cosine_distance\(|\.knn\(|knn\s*:\s*\{|\.retrieve\(|\.as_query_engine\(|VectorIndexRetriever\(|retriever\.a?invoke\(|\.a?get_relevant_documents\(",
+    "INGEST": r"\.add_documents\(|\.add_texts\(|\.addDocuments\(|\.from_documents\(|\.from_texts\(|\.fromDocuments\(|\.fromTexts\(|\.upsert\(|\.add\(\s*(ids|documents|embeddings)\s*=|VectorStoreIndex\.from_documents\(|\.insert_nodes\(|\.index_documents\(|\.batch\.add_object|data\.insert\(",
+    "LOADER": r"WebBaseLoader|RecursiveUrlLoader|SitemapLoader|UnstructuredURLLoader|PlaywrightURLLoader|SeleniumURLLoader|FireCrawlLoader|CheerioWebBaseLoader|PuppeteerWebBaseLoader|PyPDFLoader|PDFLoader|UnstructuredFileLoader|UnstructuredLoader|DirectoryLoader|S3FileLoader|GoogleDriveLoader|ConfluenceLoader|NotionDBLoader|NotionLoader|GitbookLoader|SimpleDirectoryReader|SimpleWebPageReader|download_loader|Docx2txtLoader|CSVLoader|JSONLoader",
+    "ACL_HINT": r"(?i:filter|where|namespace|tenant|metadata_?filter|must\s*=|\$in\b|\$eq\b|user_?id|owner|\bacl\b|partition|permission|access|allowed|roles?\b|org_?id|account_?id|group_?ids?)",
+}
+
+RULES = [
+    # ------------------------------------------------------------------ POISON
+    {
+        "id": "rag-upload-indexed-directly", "check_id": "RAG-POISON-001", "title": "User uploads indexed directly into the knowledge base",
+        "files": ["code"], "file_requires": r"(?i)(multer|UploadFile|request\.files|req\.files?\b|formidable|busboy|upload)",
+        "pattern": "{{INGEST}}",
+        "not_near": {"pattern": r"(?i)(quarantine|review|approv|pending|moderat|scan)", "lines": 6},
+        "confidence": "MEDIUM", "note": "Anyone who can upload can plant instructions for every user's answers. Review or quarantine first.",
+        "examples": {"match": ["@app.post('/upload')\nasync def upload(file: UploadFile):\n    docs = loader.load(file)\n    vectorstore.add_documents(docs)"],
+                     "no_match": ["@app.post('/upload')\nasync def upload(file: UploadFile):\n    await queue_for_review(file)\n    # approved docs are indexed by the ingestion job\n    vectorstore.add_documents(approved)  # after review"]},
+    },
+    {
+        "id": "rag-loader-no-sanitize", "check_id": "RAG-POISON-002", "type": "absence", "scope": "file",
+        "title": "Documents loaded and indexed without any sanitization or scanning", "files": ["code"],
+        "when": "{{LOADER}}",
+        "missing": r"(?i)(sanitiz|clean|strip|scan|zero.?width|invisible|unicodedata|normalize|bleach|allow_?list|approved|quarantine|review|detect_injection)",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["docs = WebBaseLoader(urls).load()\nstore.add_documents(splitter.split_documents(docs))"],
+                     "no_match": ["docs = [sanitize(d) for d in WebBaseLoader(urls).load()]\nstore.add_documents(docs)"]},
+    },
+    # ------------------------------------------------------------------ EMBED
+    {
+        "id": "rag-embedding-endpoint", "check_id": "RAG-EMBED-001", "title": "Embedding endpoint exposed by the application",
+        "files": ["code"], "pattern": r"['\"`][^'\"`\s]*/(embed|embeddings|embedding|vectors?|vectorize)['\"`]",
+        "near": {"pattern": r"(?i)(get|post|route|router|app\.|@)", "lines": 0}, "confidence": "LOW",
+        "note": "Raw embedding access enables inversion and membership inference; restrict and rate-limit it.",
+        "examples": {"match": ["@app.post('/api/embeddings')"], "no_match": ["@app.post('/api/chat')"]},
+    },
+    {
+        "id": "rag-trust-remote-code", "check_id": "RAG-EMBED-003", "title": "Model loaded with trust_remote_code",
+        "files": ["code"], "pattern": r"trust_remote_code\s*=\s*True|trustRemoteCode\s*:\s*true", "confidence": "HIGH",
+        "note": "Executes Python from the model repository on load.",
+        "examples": {"match": ["model = SentenceTransformer('org/model', trust_remote_code=True)"], "no_match": ["model = SentenceTransformer('org/model', revision='abc123')"]},
+    },
+    {
+        "id": "rag-embedding-model-unpinned", "check_id": "RAG-EMBED-003", "title": "Embedding model loaded without a pinned revision",
+        "files": ["code"], "pattern": r"(SentenceTransformer|AutoModel\w*\.from_pretrained|HuggingFaceEmbeddings|HuggingFaceBgeEmbeddings|FastEmbedEmbeddings|pipeline)\(\s*(model_name\s*=\s*)?['\"][\w.-]+/[\w.-]+['\"]",
+        "not_near": {"pattern": r"revision\s*=", "lines": 2}, "confidence": "LOW",
+        "examples": {"match": ["emb = HuggingFaceEmbeddings(model_name='BAAI/bge-small-en-v1.5')"], "no_match": ["m = SentenceTransformer('BAAI/bge-small-en-v1.5', revision='5c38ec7')"]},
+    },
+    # ------------------------------------------------------------------ CTX
+    {
+        "id": "rag-context-in-system-prompt", "check_id": "RAG-CTX-001", "title": "Retrieved content placed in the system prompt",
+        "files": ["code"],
+        "pattern": r"(?i)(['\"]?role['\"]?\s*:\s*['\"]system['\"][^}\n]*(context|docs|documents|retrieved|chunks|sources|page_content)|system_?(prompt|message)\w*\s*[:=]\s*(f['\"]|`)[^\n]*\{\$?\{?\s*(context|docs|documents|retrieved|chunks|sources)|SystemMessage\(\s*(content\s*=\s*)?f['\"][^\n]*\{(context|docs|retrieved|chunks))",
+        "confidence": "HIGH", "note": "Retrieved text then carries instruction-level trust. Put it in a delimited user/tool message.",
+        "examples": {"match": ["messages = [{'role': 'system', 'content': f'Answer using this context: {context}'}]"],
+                     "no_match": ["messages = [{'role': 'system', 'content': SYSTEM}, {'role': 'user', 'content': f'<documents>{context}</documents>\\nQuestion: {q}'}]"]},
+    },
+    {
+        "id": "rag-context-no-delimiters", "check_id": "RAG-CTX-001", "title": "Retrieved chunks joined into the prompt without delimiters",
+        "files": ["code"], "pattern": r"(?i)['\"](\\n)+['\"]\s*\.join\(|\.join\(\s*['\"](\\n)+['\"]\s*\)|\.map\([^)]*page_?[cC]ontent[^)]*\)\.join\(",
+        "near": {"pattern": r"(?i)(page_?content|docs|documents|chunks|retrieved|context)", "lines": 2},
+        "not_near": {"pattern": r"(?i)(<document|<context|<source|---|\[\[|###|BEGIN|delimit|untrusted|data only)", "lines": 4},
+        "confidence": "LOW",
+        "examples": {"match": ["context = '\\n\\n'.join(d.page_content for d in docs)"], "no_match": ["context = '\\n'.join(f'<document id=\"{d.id}\">{d.page_content}</document>' for d in docs)"]},
+    },
+    {
+        "id": "rag-large-top-k", "check_id": "RAG-CTX-002", "title": "Large number of retrieved chunks",
+        "files": ["code", "config"], "pattern": r"(?i)\b(k|top_k|topK|n_results|nResults|similarity_top_k|limit|fetch_k)\s*['\"]?\s*[:=]\s*([1-9]\d+)\b",
+        "near": {"pattern": "{{VECTOR_QUERY}}|(?i:retriev|search_kwargs|vector)", "lines": 3}, "confidence": "LOW",
+        "examples": {"match": ["retriever = store.as_retriever(search_kwargs={'k': 25})"], "no_match": ["retriever = store.as_retriever(search_kwargs={'k': 4, 'filter': f})"]},
+    },
+    # ------------------------------------------------------------------ ACL / ISO
+    {
+        "id": "rag-ingest-no-acl-metadata", "check_id": "RAG-ACL-001", "title": "Chunks indexed without access-control metadata",
+        "files": ["code"], "pattern": "{{INGEST}}", "not_near": {"pattern": "{{ACL_HINT}}|(?i:metadata)", "lines": 6},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["chunks = splitter.split_documents(docs)\nvectorstore.add_documents(chunks)"],
+                     "no_match": ["for c in chunks: c.metadata.update(tenant_id=t, allowed_groups=g)\nvectorstore.add_documents(chunks)"]},
+    },
+    {
+        "id": "rag-retrieval-no-filter", "check_id": "RAG-ACL-002", "title": "Vector search without a tenant/permission filter",
+        "files": ["code"], "pattern": "{{VECTOR_QUERY}}", "not_near": {"pattern": "{{ACL_HINT}}", "lines": 4},
+        "confidence": "MEDIUM", "note": "Filter inside the vector query (pre-filter); post-filtering leaks via ranking and scores.",
+        "examples": {"match": ["docs = vectorstore.similarity_search(question, k=4)"],
+                     "no_match": ["docs = vectorstore.similarity_search(question, k=4, filter={'tenant_id': user.tenant_id})"]},
+    },
+    {
+        "id": "rag-post-filter", "check_id": "RAG-ACL-002", "title": "Retrieve-then-filter access control",
+        "files": ["code"],
+        "pattern": r"(?i)\[\s*\w+\s+for\s+\w+\s+in\s+(docs|results|chunks|hits|matches)\s+if\s+[^\]]*(tenant|owner|user|allowed|acl|permission|role)|\.(filter)\(\s*\(?\s*\w+\s*\)?\s*=>\s*[^)]*(tenant|owner|userId|allowed|acl|permission|role)",
+        "near": {"pattern": "{{VECTOR_QUERY}}", "lines": 6}, "confidence": "MEDIUM",
+        "examples": {"match": ["docs = store.similarity_search(q, k=50)\ndocs = [d for d in docs if d.metadata['tenant'] == user.tenant]"],
+                     "no_match": ["docs = store.similarity_search(q, k=5, filter={'tenant': user.tenant})"]},
+    },
+    {
+        "id": "rag-delete-not-cascaded", "check_id": "RAG-ACL-003", "type": "absence", "scope": "project",
+        "title": "Documents can be deleted but nothing removes their vectors", "files": ["code"],
+        "when": r"(?i)(def|function|async\s+function|const)\s+\w*(delete|remove)_?(document|doc|file|upload|source)\w*|['\"`][^'\"`\s]*/(documents?|files?|sources?)/[:{]\w+[}]?['\"`][^\n]*(delete|DELETE)",
+        "missing": r"(?i)(vector\w*|index|collection|embedding\w*|namespace|store)\.(delete|remove|delete_by\w*|deleteMany|drop|delete_documents|delete_points)\(|\.delete\(\s*(ids|filter|where|points_selector)\s*=",
+        "confidence": "LOW", "note": "Deleted or de-permissioned documents stay retrievable through orphaned chunks.",
+        "examples": {"match": ["async function deleteDocument(id) { await db.documents.delete(id); }"], "no_match": ["async function deleteDocument(id) { await db.documents.delete(id); await vectorStore.delete({ filter: { docId: id } }); }"]},
+    },
+    # ------------------------------------------------------------------ INDEX
+    {
+        "id": "rag-vector-db-no-auth", "check_id": "RAG-INDEX-001", "type": "absence", "scope": "file",
+        "title": "Vector database container without authentication configured", "files": ["docker", "config"],
+        "when": r"(?i)image\s*:\s*['\"]?[\w./-]*(qdrant/qdrant|chromadb/chroma|semitechnologies/weaviate|weaviate|milvusdb/milvus|redis/redis-stack|opensearchproject/opensearch|typesense/typesense|marqoai|vespaengine)",
+        "missing": r"(?i)(QDRANT__SERVICE__API_KEY|CHROMA_SERVER_AUTH\w*|AUTHENTICATION_APIKEY_ENABLED\s*:\s*['\"]?true|AUTHENTICATION_OIDC_ENABLED\s*:\s*['\"]?true|common\.security\.authorizationEnabled|MILVUS\w*AUTH|plugins\.security|DISABLE_SECURITY_PLUGIN\s*[:=]\s*['\"]?false|requirepass|--api-key|TYPESENSE_API_KEY)",
+        "confidence": "HIGH", "note": "Many vector stores ship with authentication off. 'Internal only' is not access control.",
+        "examples": {"match": ["services:\n  qdrant:\n    image: qdrant/qdrant:v1.12.0\n    ports:\n      - \"6333:6333\""],
+                     "no_match": ["services:\n  qdrant:\n    image: qdrant/qdrant:v1.12.0\n    environment:\n      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}"]},
+    },
+    {
+        "id": "rag-vector-client-no-auth", "check_id": "RAG-INDEX-001", "title": "Vector store client connects without credentials",
+        "files": ["code"],
+        "pattern": r"QdrantClient\(\s*(url|host)\s*=|chromadb\.HttpClient\(|weaviate\.connect_to_(local|custom)\(|MilvusClient\(\s*(uri\s*=\s*)?['\"]http|new\s+QdrantClient\(\s*\{\s*url|new\s+ChromaClient\(",
+        "not_near": {"pattern": r"(?i)(api_?key|apiKey|auth|token|headers|credentials|password|settings\s*=)", "lines": 3},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["client = QdrantClient(url='http://qdrant:6333')"], "no_match": ["client = QdrantClient(url=QDRANT_URL, api_key=os.environ['QDRANT_API_KEY'])"]},
+    },
+    {
+        "id": "rag-vector-port-published", "check_id": "RAG-INDEX-001", "title": "Vector database port published on all interfaces",
+        "files": ["docker", "config"], "pattern": r"^\s*-\s*['\"]?(0\.0\.0\.0:)?(6333|6334|19530|9091|8108|8529|19121)\s*:\s*\d+['\"]?\s*$",
+        "confidence": "MEDIUM", "examples": {"match": ["    ports:\n      - \"6333:6333\""], "no_match": ["      - \"127.0.0.1:6333:6333\""]},
+    },
+    # ------------------------------------------------------------------ QUERY
+    {
+        "id": "rag-scores-exposed", "check_id": "RAG-QUERY-002", "title": "Similarity scores returned to the caller",
+        "files": ["code"],
+        "pattern": r"(?i)(res\.(json|send)|return\s+(jsonify|JSONResponse|Response|\{|dict\()|c\.JSON\()[^\n]*\b(score|scores|distance|distances|similarity|relevance)\b",
+        "file_requires": "{{VECTOR_QUERY}}|(?i:with_score|withScore|with_relevance_score)", "confidence": "LOW",
+        "examples": {"match": ["return {'answer': answer, 'sources': [{'id': d.id, 'score': s} for d, s in hits]}  # similarity_search_with_score("],
+                     "no_match": ["return {'answer': answer, 'sources': [d.id for d in hits]}  # similarity_search("]},
+    },
+    # ------------------------------------------------------------------ CACHE
+    {
+        "id": "rag-shared-cache", "check_id": "RAG-CACHE-001", "title": "LLM/semantic or retrieval cache: confirm it is keyed by user, tenant and permissions",
+        "files": ["code"],
+        "pattern": r"set_llm_cache\(|RedisSemanticCache|SemanticCache|GPTCache|InMemoryCache\(|SQLiteCache\(|@lru_cache|@functools\.(lru_)?cache|@cache\b|\bmemoize\(",
+        "file_requires": "{{VECTOR_QUERY}}|(?i:llm|openai|anthropic|retriev|embedding)",
+        "confidence": "MEDIUM", "note": "A cache keyed only on the question returns user A's answer (built from A's documents) to user B.",
+        "examples": {"match": ["set_llm_cache(RedisSemanticCache(redis_url=URL, embedding=emb))  # retriever = store.as_retriever("],
+                     "no_match": ["answer = chain.invoke({'question': q})  # llm"]},
+    },
+    # ------------------------------------------------------------------ MON / FAIL
+    {
+        "id": "rag-log-raw-content", "check_id": "RAG-MON-001", "title": "Raw queries or retrieved content logged",
+        "files": ["code"], "file_requires": "{{VECTOR_QUERY}}",
+        "pattern": r"(?i){{LOG_CALL}}.{0,80}(?<!len\()\b(query|question|docs|documents|chunks|context|page_content|retrieved|prompt)\w*\s*[,)+}]",
+        "confidence": "LOW", "note": "Log IDs and decisions; store redacted content only in a restricted evidence store.",
+        "examples": {"match": ["docs = store.similarity_search(q)\nlogger.info(f'retrieved {docs}')"], "no_match": ["docs = store.similarity_search(q, filter=f)\nlogger.info('retrieved %d docs for %s', len(docs), req_id)"]},
+    },
+    {
+        "id": "rag-fallback-to-model", "check_id": "RAG-FAIL-001", "title": "Empty or failed retrieval falls through to the model",
+        "files": ["code"], "file_requires": "{{VECTOR_QUERY}}",
+        "pattern": r"(?i)(if\s*\(?\s*(not\s+|!)\s*(docs|documents|results|context|chunks|retrieved|hits)\w*(\.length)?\s*\)?\s*:?|except\s+\w*(Exception|Error)\w*(\s+as\s+\w+)?\s*:|catch\s*\(\s*\w*\s*\)\s*\{)",
+        "near": {"pattern": r"(?i)(llm|chain|model|openai|anthropic|generate|complete|invoke)\w*\.?\w*\(", "lines": 3},
+        "not_near": {"pattern": r"(?i)(raise|throw|abort|HTTPException|status\(5|status_code\s*=\s*5|unavailable|refuse|cannot answer|no relevant)", "lines": 3},
+        "confidence": "MEDIUM", "note": "Answering from model memory bypasses every RAG control (and attackers can force failures).",
+        "examples": {"match": ["docs = retriever.invoke(q)\nif not docs:\n    return llm.invoke(q).content"],
+                     "no_match": ["docs = retriever.invoke(q)\nif not docs:\n    raise HTTPException(503, 'Knowledge base unavailable')"]},
+    },
+]
