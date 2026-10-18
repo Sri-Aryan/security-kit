@@ -1,0 +1,142 @@
+{
+  "$comment": "Single source for how skills are grouped and summarised. Used by `securitykit skills`, /sk-help and README.md (regenerate with: python tools/gen_catalog_docs.py). Every skills/sk-* folder must appear exactly once. Summaries: one line, at most 90 characters.",
+  "groups": [
+    {
+      "id": "workflows",
+      "title": "Workflows",
+      "blurb": "Start here: whole-project audits, everyday change reviews, and fixing what was found.",
+      "skills": [
+        { "name": "sk-help", "summary": "List every SecurityKit command, grouped, with a one-line description" },
+        { "name": "sk-audit", "summary": "Run every relevant skill and produce one combined, deduplicated report and score" },
+        { "name": "sk-review", "summary": "Fast security review of the current diff, branch or PR only" },
+        { "name": "sk-fix", "summary": "Work through findings from any report, applying approved fixes with re-verification" }
+      ]
+    },
+    {
+      "id": "api",
+      "title": "APIs",
+      "blurb": "HTTP, REST, GraphQL, gRPC, real-time and webhook surfaces, and the contracts that describe them.",
+      "skills": [
+        { "name": "sk-api", "summary": "API audit: auth and ownership on every endpoint, errors, validation, missing tests" },
+        { "name": "sk-rest", "summary": "REST baseline: HTTPS, methods, content types, size limits, headers, CORS, errors" },
+        { "name": "sk-graphql", "summary": "GraphQL: introspection, depth/cost limits, batching, field-level authorization" },
+        { "name": "sk-openapi", "summary": "OpenAPI/Swagger spec vs code: undocumented and stale endpoints, auth mismatches" },
+        { "name": "sk-webhooks", "summary": "Webhooks received (signatures, replay) and sent (SSRF, signing)" },
+        { "name": "sk-websocket", "summary": "WebSockets, SSE and real-time: handshake auth, Origin, channel authorization, limits" },
+        { "name": "sk-grpc", "summary": "gRPC: TLS, auth interceptors, per-method authorization, reflection, limits, deadlines" }
+      ]
+    },
+    {
+      "id": "identity",
+      "title": "Identity & access",
+      "blurb": "Who the user is, how they prove it, and what they are allowed to do.",
+      "skills": [
+        { "name": "sk-auth", "summary": "Login, sessions, MFA, enumeration, brute force, account recovery, SSO linking" },
+        { "name": "sk-password", "summary": "Password hashing parameters, policy, change and reset flows, credential stuffing" },
+        { "name": "sk-tokens", "summary": "JWT verification, token randomness and storage, refresh rotation, API keys" },
+        { "name": "sk-oauth2", "summary": "OAuth 2.0 / OIDC: PKCE, state, redirect URIs, ID tokens, audiences, scopes" },
+        { "name": "sk-saml", "summary": "SAML SSO: signature checks and wrapping, audience, replay, certificates, RelayState" },
+        { "name": "sk-authz", "summary": "Access-control design: default deny, roles, tenant isolation, IDOR, escalation" }
+      ]
+    },
+    {
+      "id": "input",
+      "title": "Injection & untrusted input",
+      "blurb": "Every place user data reaches an interpreter, a browser, a URL fetcher or a parser.",
+      "skills": [
+        { "name": "sk-validation", "summary": "Input validation: schemas, mass assignment, type confusion, ranges, allow-lists" },
+        { "name": "sk-inject", "summary": "All injection: SQL, NoSQL, command, code, SSTI, LDAP, XPath, XXE, header, log" },
+        { "name": "sk-xss", "summary": "Cross-site scripting: DOM sinks, escaping bypasses, sanitizers, CSP" },
+        { "name": "sk-ssrf", "summary": "Server-side request forgery: URL fetches, private IPs, DNS rebinding, cloud metadata" },
+        { "name": "sk-redirect", "summary": "Open redirects: next/returnUrl parameters, bypassable validation, login flows" },
+        { "name": "sk-deserialize", "summary": "Unsafe deserialization (pickle, YAML, Java/.NET/PHP) and prototype pollution" },
+        { "name": "sk-upload", "summary": "File uploads: type checks, names, size, storage, serving, presigned URLs, zip slip" }
+      ]
+    },
+    {
+      "id": "web",
+      "title": "Web & browser",
+      "blurb": "What the browser enforces, what the server tells it, and what caches and configs leak.",
+      "skills": [
+        { "name": "sk-browser", "summary": "Security headers, clickjacking, cookie flags, tokens in storage, bundle secrets, SRI" },
+        { "name": "sk-csrf", "summary": "CSRF: disabled protection, state-changing GETs, SameSite, CORS with credentials" },
+        { "name": "sk-cache", "summary": "Caching: personal data cached publicly, cache poisoning and deception, shared keys" },
+        { "name": "sk-config", "summary": "Misconfiguration: debug modes, stack traces, open actuators, fallback secrets" }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data, privacy & crypto",
+      "blurb": "Where data lives, who can read it, how it is protected, and what the logs say about it.",
+      "skills": [
+        { "name": "sk-database", "summary": "Raw queries, row scoping, DB exposure, TLS, privileges and hardening" },
+        { "name": "sk-privacy", "summary": "Personal data: minimization, exposure, third parties, consent, deletion, retention" },
+        { "name": "sk-crypto", "summary": "Cryptography: algorithms, modes, IVs, keys and KDFs, randomness, TLS verification" },
+        { "name": "sk-logging", "summary": "Security logging: events, audit trails, secrets in logs, alerting, retention" }
+      ]
+    },
+    {
+      "id": "logic",
+      "title": "Business logic & abuse",
+      "blurb": "Money, limits, workflows and background work: the bugs scanners alone don't find.",
+      "skills": [
+        { "name": "sk-business", "summary": "Business logic abuse: client-set prices, coupon reuse, skipped steps, limits" },
+        { "name": "sk-race", "summary": "Race conditions: double spend, check-then-act, missing locks, idempotency" },
+        { "name": "sk-payments", "summary": "Payments: server-side amounts, webhook verification, refunds, card data scope" },
+        { "name": "sk-ratelimit", "summary": "Rate limits and quotas: login, OTP, expensive endpoints, IP spoofing, bypasses" },
+        { "name": "sk-dos", "summary": "Resource exhaustion: body/page limits, ReDoS, zip bombs, timeouts, unbounded work" },
+        { "name": "sk-email", "summary": "Email and SMS: header injection, poisoned links, spam relays, SMS pumping" },
+        { "name": "sk-queue", "summary": "Queues and jobs: broker auth, unsafe serializers, worker authz, dashboards, DLQs" }
+      ]
+    },
+    {
+      "id": "ai",
+      "title": "AI & agents",
+      "blurb": "LLM features, prompt injection, tool-using agents, MCP servers and retrieval.",
+      "skills": [
+        { "name": "sk-ai", "summary": "LLM features vs OWASP LLM Top 10: unsafe output, leaks, PII, cost abuse, keys" },
+        { "name": "sk-prompt-injection", "summary": "Prompt injection: untrusted channels, system prompts, tool approvals, outputs" },
+        { "name": "sk-agents", "summary": "Agents and MCP: tool permissions, inputs, sandboxes, human approval, server trust" },
+        { "name": "sk-rag", "summary": "RAG pipelines: poisoning, per-chunk access control, tenant isolation, vector stores" }
+      ]
+    },
+    {
+      "id": "apps",
+      "title": "Apps & platforms",
+      "blurb": "Code that runs on users' devices: phones, desktops and browsers.",
+      "skills": [
+        { "name": "sk-mobile", "summary": "Android/iOS (MASVS): storage, cleartext, TLS, exported components, WebViews" },
+        { "name": "sk-electron", "summary": "Electron/Tauri: node integration, isolation, preload and IPC, openExternal, updates" },
+        { "name": "sk-extension", "summary": "Browser extensions: permissions, remote code, message senders, content scripts" }
+      ]
+    },
+    {
+      "id": "infra",
+      "title": "Supply chain & infrastructure",
+      "blurb": "What ships with the code: dependencies, credentials, containers, clouds, pipelines and domains.",
+      "skills": [
+        { "name": "sk-secrets", "summary": "Hardcoded and leaked secrets in code, config, git history, CI and images" },
+        { "name": "sk-deps", "summary": "Dependencies: vulnerabilities, lockfiles, typosquats, confusion, install scripts" },
+        { "name": "sk-docker", "summary": "Dockerfiles, Compose and Kubernetes: root, privileges, mounts, images, secrets" },
+        { "name": "sk-cloud", "summary": "Cloud IaC: public buckets, wildcard IAM, open ports, encryption, IMDSv2, state" },
+        { "name": "sk-cicd", "summary": "CI/CD pipelines: triggers, script injection, token permissions, pinning, runners" },
+        { "name": "sk-repo", "summary": "Repository hygiene: policy, CODEOWNERS, branch protection, tracked secrets, scans" },
+        { "name": "sk-domain", "summary": "Domains and DNS: subdomain takeover, SPF/DKIM/DMARC, CAA, security.txt" }
+      ]
+    },
+    {
+      "id": "design",
+      "title": "Design, testing & assurance",
+      "blurb": "Threat models, tests and scans that prove controls work, and the evidence auditors ask for.",
+      "skills": [
+        { "name": "sk-design", "summary": "Threat model: assets, trust boundaries, data flows, STRIDE per component" },
+        { "name": "sk-tests", "summary": "Security test gaps (authn, authz, validation) and generation of the missing tests" },
+        { "name": "sk-fuzz", "summary": "Property-based tests and fuzzing for parsers and input handlers" },
+        { "name": "sk-dast", "summary": "Dynamic scan of a running app you own (OWASP ZAP), with confirmed findings" },
+        { "name": "sk-asvs", "summary": "OWASP ASVS 5.0 coverage map at level 1-3, from all SecurityKit reports" },
+        { "name": "sk-compliance", "summary": "Map findings to SOC 2, ISO 27001, PCI DSS, HIPAA and GDPR controls" },
+        { "name": "sk-incident", "summary": "Incident readiness: plan, on-call, alerts, revocation, rotation, backups" }
+      ]
+    }
+  ]
+}
