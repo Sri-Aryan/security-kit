@@ -1,0 +1,438 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/getsecuritykit/kit/skills/sk-authz/schema/report.schema.json",
+  "title": "SecurityKit sk-authz report",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "tool",
+    "generatedAt",
+    "scope",
+    "modes",
+    "score",
+    "summary",
+    "findings",
+    "passed",
+    "skipped",
+    "inventory"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "tool": {
+      "type": "object",
+      "required": [
+        "name",
+        "skill",
+        "version"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "const": "SecurityKit"
+        },
+        "skill": {
+          "const": "sk-authz"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "full",
+            "section"
+          ]
+        },
+        "section": {
+          "type": "string"
+        }
+      }
+    },
+    "modes": {
+      "type": "object",
+      "required": [
+        "static",
+        "dynamic"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "static": {
+          "type": "boolean"
+        },
+        "dynamic": {
+          "type": "boolean"
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "URL probed in dynamic mode"
+        },
+        "ownershipConfirmed": {
+          "type": "boolean"
+        },
+        "fix": {
+          "type": "boolean"
+        },
+        "tests": {
+          "type": "boolean"
+        }
+      }
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "passed",
+        "skipped"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "critical": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "high": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "medium": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "low": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "needsReview": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidatesReviewed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidatesRejected": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "needsReview": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "checkId",
+          "location",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "checkId": {
+            "$ref": "#/$defs/checkId"
+          },
+          "location": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "passed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "checkId"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "checkId": {
+            "$ref": "#/$defs/checkId"
+          },
+          "title": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "checkId",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "checkId": {
+            "$ref": "#/$defs/checkId"
+          },
+          "title": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "inventory": {
+      "type": "array",
+      "description": "What was audited (operations, receivers/senders, spec-vs-code rows). Shape varies by skill.",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "name"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "findingIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "checkId": {
+      "type": "string",
+      "pattern": "^AUTHZ-[A-Z][A-Z0-9]*-[0-9]{3}$"
+    },
+    "severity": {
+      "enum": [
+        "Critical",
+        "High",
+        "Medium",
+        "Low"
+      ]
+    },
+    "location": {
+      "type": "object",
+      "required": [
+        "file",
+        "line"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Path relative to the project root, forward slashes"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "endLine": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "method",
+        "url",
+        "status",
+        "responseExcerpt"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "as": {
+          "type": "string"
+        },
+        "requestExcerpt": {
+          "type": "string"
+        },
+        "status": {
+          "type": "integer"
+        },
+        "responseExcerpt": {
+          "type": "string"
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "id",
+        "checkId",
+        "title",
+        "severity",
+        "evidence",
+        "impact",
+        "fix",
+        "regressionTest",
+        "references",
+        "source"
+      ],
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "location"
+          ]
+        },
+        {
+          "required": [
+            "request"
+          ]
+        }
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^SK-AUTHZ-[0-9]{4}$"
+        },
+        "checkId": {
+          "$ref": "#/$defs/checkId"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "regressionTest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "references": {
+          "type": "object",
+          "required": [
+            "owasp",
+            "cwe"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "owasp": {
+              "type": "array",
+              "description": "OWASP API Top 10 2023 (API1-API10) or OWASP Top 10 2021 (A01-A10)",
+              "items": {
+                "type": "string",
+                "pattern": "^(API([1-9]|10)(:2023)?|A(0[1-9]|10)(:2021)?)$"
+              }
+            },
+            "cwe": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^CWE-[0-9]+$"
+              }
+            }
+          }
+        },
+        "source": {
+          "enum": [
+            "script",
+            "review",
+            "dynamic"
+          ]
+        },
+        "severityAdjusted": {
+          "type": "string"
+        },
+        "fixed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

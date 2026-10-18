@@ -1,0 +1,305 @@
+{
+  "_generated": "from tools/rules_src/authz.py; edit the source and run tools/build_rules.py",
+  "macros": {
+    "SRC_JS": "\\breq\\.(query|body|params|headers|cookies)|\\brequest\\.(query|body|params)|\\bctx\\.(query|params|request\\.body)|\\bevent\\.(body|queryStringParameters|pathParameters)|searchParams\\.get\\(",
+    "SRC_PY": "\\brequest\\.(args|form|json|values|data|GET|POST|query_params|get_json|files|headers|cookies|path_params|view_args)|\\bself\\.request\\b",
+    "SRC_JAVA": "@RequestParam|@PathVariable|@RequestBody|\\.getParameter\\(|\\.getHeader\\(|\\.getQueryString\\(",
+    "SRC_GO": "\\.URL\\.Query\\(\\)|\\.FormValue\\(|\\.PostFormValue\\(|\\bc\\.(Query|Param|PostForm|DefaultQuery|GetHeader)\\(|mux\\.Vars\\(|chi\\.URLParam\\(",
+    "SRC_PHP": "\\$_(GET|POST|REQUEST|COOKIE|SERVER|FILES)\\b|\\$request->(input|get|query|post)\\(",
+    "SRC_RB": "\\bparams\\[|\\brequest\\.(params|body|headers)",
+    "SRC_CS": "\\bRequest\\.(Query|Form|Headers|Cookies)\\b|\\[From(Query|Body|Route|Form|Header)\\]",
+    "SRC": "{{SRC_JS}}|{{SRC_PY}}|{{SRC_JAVA}}|{{SRC_GO}}|{{SRC_PHP}}|{{SRC_RB}}|{{SRC_CS}}",
+    "ROLE_FIELD": "(?:role|roles|is_?admin|isAdmin|admin|is_?staff|is_?superuser|permissions?|scopes?|access_?level|accessLevel|user_?type|userType|plan|tier)",
+    "TENANT_FIELD": "(?:tenant[_-]?id|org[_-]?id|organization[_-]?id|account[_-]?id|workspace[_-]?id|team[_-]?id|company[_-]?id)",
+    "AUTHZ_CHECK": "(?i:owner|user_?id|userId|tenant|org_?id|orgId|account_?id|created_?by|author|authori[sz]e|can\\(|cannot\\(|policy|permission|forbid|ability|ensure\\w*|assert\\w*access|check\\w*access|scope|where\\s*:\\s*\\{[^}]*user)",
+    "ROUTE_DEF": "(?:\\b(app|router|server|api|route)\\.(get|post|put|patch|delete|all)\\(|@(Get|Post|Put|Patch|Delete|Request)Mapping|@(app|router|bp|blueprint)\\.(get|post|put|patch|delete|route)\\(|\\b(re_)?path\\(|\\bRoute::(get|post|put|patch|delete)|\\bMap(Get|Post|Put|Delete|Patch)\\(|\\.(GET|POST|PUT|PATCH|DELETE)\\()"
+  },
+  "rules": [
+    {
+      "id": "authz-role-from-request",
+      "check_id": "AUTHZ-CLIENT-001",
+      "title": "Role or permission read from client-controlled input",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)({{SRC}})(\\.|\\[\\s*['\\\"]|\\.get\\(\\s*['\\\"]|\\(\\s*['\\\"])x?-?(user-)?{{ROLE_FIELD}}\\b",
+      "near": {
+        "pattern": "(?i)\\bif\\b|\\?|&&|\\|\\||role|admin|permission|authori|grant|allow",
+        "lines": 2
+      },
+      "confidence": "HIGH",
+      "note": "Anyone can send role=admin. Read roles from the server-side session/user record.",
+      "examples": {
+        "match": [
+          "if (req.body.isAdmin) return next();",
+          "if request.headers.get('X-User-Role') == 'admin':",
+          "if ($_COOKIE['role'] === 'admin') {"
+        ],
+        "no_match": [
+          "if (req.user.role === 'admin') return next();"
+        ]
+      }
+    },
+    {
+      "id": "authz-tenant-from-request",
+      "check_id": "AUTHZ-TENANT-001",
+      "title": "Tenant/organization ID taken from the request",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)({{SRC}})(\\.|\\[\\s*['\\\"]|\\.get\\(\\s*['\\\"]|\\(\\s*['\\\"])x?-?{{TENANT_FIELD}}\\b",
+      "not_near": {
+        "pattern": "(?i)(membership|isMember|is_member|belongs|memberOf|member_of|assert\\w*(tenant|org)|check\\w*(tenant|org)|req\\.user\\.(tenant|org)|current_?(tenant|org)\\w*\\s*(==|!=|===|!==))",
+        "lines": 4
+      },
+      "confidence": "MEDIUM",
+      "note": "Take the tenant from the session, or verify membership before using a requested tenant.",
+      "examples": {
+        "match": [
+          "const invoices = await db.invoice.findMany({ where: { orgId: req.query.orgId } });",
+          "tenant = request.headers.get('X-Tenant-Id')"
+        ],
+        "no_match": [
+          "const invoices = await db.invoice.findMany({ where: { orgId: req.user.orgId } });"
+        ]
+      }
+    },
+    {
+      "id": "authz-update-user-from-body",
+      "check_id": "AUTHZ-ESC-001",
+      "title": "User/account record updated straight from the request body",
+      "files": [
+        "code"
+      ],
+      "pattern": "(\\.(update|updateOne|findByIdAndUpdate|findOneAndUpdate|update_attributes|assign_attributes|fill|merge|set)\\w*\\(\\s*[^\\n]*?|Object\\.assign\\(\\s*\\w+\\s*,\\s*|\\{\\s*\\.\\.\\.)({{SRC_JS}}|request\\.(json|data|form|POST|get_json\\(\\))|params\\.permit!|\\$request->all\\(\\)|\\$_POST)\\s*[,)}]",
+      "near": {
+        "pattern": "(?i)\\b(user|account|member|profile|me)\\b",
+        "lines": 3
+      },
+      "confidence": "MEDIUM",
+      "note": "A body with role, isAdmin, orgId or ownerId changes them. Copy an allow-list of fields.",
+      "examples": {
+        "match": [
+          "await User.findByIdAndUpdate(req.user.id, req.body);",
+          "user.update_attributes(params.permit!)"
+        ],
+        "no_match": [
+          "await User.findByIdAndUpdate(req.user.id, { name: req.body.name, bio: req.body.bio });"
+        ]
+      }
+    },
+    {
+      "id": "authz-role-assignment-endpoint",
+      "check_id": "AUTHZ-ESC-001",
+      "title": "Role/permission changed from request data",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\b\\w*\\.?{{ROLE_FIELD}}\\s*=\\s*({{SRC}})[\\w.\\[\\]'\\\"]*",
+      "not_near": {
+        "pattern": "(?i)(isAdmin|is_admin|hasRole|has_role|requireAdmin|admin_required|@PreAuthorize|authorize|policy|can\\(|ALLOWED_ROLES|role\\s+in\\s|includes\\(\\s*\\w*role)",
+        "lines": 5
+      },
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "member.role = req.body.role;\nawait member.save();"
+        ],
+        "no_match": [
+          "requireAdmin(req.user);\nif (!ALLOWED_ROLES.includes(req.body.role)) throw new Error();\nmember.role = req.body.role;"
+        ]
+      }
+    },
+    {
+      "id": "authz-find-by-request-id",
+      "check_id": "AUTHZ-OBJECT-001",
+      "title": "Object loaded by a request ID with no ownership or tenant check nearby",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\b(findById|findByPk|findUnique|findOne|findFirst|get_object_or_404|objects\\.get|getById|get_by_id|findOrFail|find_by_id|Find|First|FindAsync|findByIdOrNull)\\(\\s*[^)\\n]*({{SRC}})(\\.|\\[\\s*['\\\"]|\\.get\\(\\s*['\\\"])?\\w*(id|Id|ID|pk|uuid|slug)\\b",
+      "not_near": {
+        "pattern": "{{AUTHZ_CHECK}}",
+        "lines": 2
+      },
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const doc = await Document.findById(req.params.id);\nres.json(doc);"
+        ],
+        "no_match": [
+          "const doc = await Document.findOne({ _id: req.params.id, ownerId: req.user.id });"
+        ]
+      }
+    },
+    {
+      "id": "authz-permit-all-default",
+      "check_id": "AUTHZ-DENY-001",
+      "title": "Framework default is 'allow everyone'",
+      "files": [
+        "code",
+        "config"
+      ],
+      "pattern": "anyRequest\\(\\)\\s*\\.\\s*permitAll\\(\\)|DEFAULT_PERMISSION_CLASSES[^\\n]*AllowAny|['\\\"]DEFAULT_PERMISSION_CLASSES['\\\"]\\s*:\\s*\\[\\s*['\\\"]rest_framework\\.permissions\\.AllowAny|FallbackPolicy\\s*=\\s*null|AllowAnonymousAttribute\\(\\)\\s*\\)\\s*;?\\s*//\\s*global",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "http.authorizeHttpRequests(a -> a.anyRequest().permitAll());",
+          "REST_FRAMEWORK = { 'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'] }"
+        ],
+        "no_match": [
+          "http.authorizeHttpRequests(a -> a.requestMatchers(\"/health\").permitAll().anyRequest().authenticated());"
+        ]
+      }
+    },
+    {
+      "id": "authz-public-exception",
+      "check_id": "AUTHZ-DENY-001",
+      "title": "Endpoint explicitly marked public (review each one)",
+      "files": [
+        "code"
+      ],
+      "pattern": "permission_classes\\s*=\\s*\\[\\s*AllowAny|@PermitAll\\b|\\[AllowAnonymous\\]|\\.AllowAnonymous\\(\\)|skip_before_action\\s+:(authenticate|require_login|authorize)\\w*|@Public\\(\\)|@SkipAuth\\(\\)|isPublic\\s*:\\s*true|@csrf_exempt\\s*$",
+      "confidence": "LOW",
+      "note": "Not a vulnerability by itself: confirm each public endpoint is meant to be public and exposes nothing sensitive.",
+      "examples": {
+        "match": [
+          "class PriceList(APIView):\n    permission_classes = [AllowAny]",
+          "[AllowAnonymous]\npublic IActionResult Export() {"
+        ],
+        "no_match": [
+          "class PriceList(APIView):\n    permission_classes = [IsAuthenticated]"
+        ]
+      }
+    },
+    {
+      "id": "authz-no-global-guard",
+      "check_id": "AUTHZ-DENY-001",
+      "type": "absence",
+      "scope": "project",
+      "title": "Routes defined but no global authentication/authorization default found",
+      "files": [
+        "code",
+        "config"
+      ],
+      "when": "{{ROUTE_DEF}}",
+      "missing": "APP_GUARD|useGlobalGuards|app\\.use\\(\\s*(\\w*auth\\w*|requireAuth|passport\\.authenticate|jwt\\w*|clerkMiddleware|authMiddleware)|DEFAULT_PERMISSION_CLASSES|anyRequest\\(\\)\\s*\\.\\s*authenticated|LoginRequiredMiddleware|before_action\\s+:authenticate|RequireAuthorization\\(\\)|FallbackPolicy|router\\.use\\(\\s*(\\w*auth\\w*|requireAuth)|export\\s+(default\\s+)?(function\\s+)?middleware|matcher\\s*:",
+      "confidence": "LOW",
+      "note": "Without a global default, every new route is public until someone remembers to protect it.",
+      "examples": {
+        "match": [
+          "router.get('/api/invoices/:id', requireAuth, handler);"
+        ],
+        "no_match": [
+          "app.use(requireAuth);\nrouter.get('/api/invoices/:id', handler);"
+        ]
+      }
+    },
+    {
+      "id": "authz-admin-route-no-role",
+      "check_id": "AUTHZ-ROLE-001",
+      "title": "Admin route without a role check nearby",
+      "files": [
+        "code"
+      ],
+      "pattern": "{{ROUTE_DEF}}\\s*['\\\"`][^'\\\"`]*/admin\\b",
+      "not_near": {
+        "pattern": "(?i)(role|isAdmin|is_admin|admin_required|requireAdmin|ensureAdmin|adminOnly|hasRole|hasAuthority|hasAnyRole|@PreAuthorize|@Secured|@RolesAllowed|permission|staff_member_required|is_staff|is_superuser|authorize|policy|can\\(|Roles\\s*=)",
+        "lines": 3
+      },
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "router.delete('/admin/users/:id', requireAuth, deleteUser);"
+        ],
+        "no_match": [
+          "router.delete('/admin/users/:id', requireAuth, requireRole('admin'), deleteUser);"
+        ]
+      }
+    },
+    {
+      "id": "authz-private-files-static",
+      "check_id": "AUTHZ-STATIC-001",
+      "title": "Private-looking files served from a public static path",
+      "files": [
+        "code",
+        "config"
+      ],
+      "pattern": "(?i)(express\\.static|serveStatic|StaticFiles|static_folder|UseStaticFiles|ResourceHandler|addResourceHandlers|location\\s+/)[^\\n]*(upload|private|export|report|invoice|document|attachment|backup|statement|receipt)s?\\b",
+      "confidence": "MEDIUM",
+      "note": "Anyone with the URL can download. Serve through an authorized route or short-lived signed URLs.",
+      "examples": {
+        "match": [
+          "app.use('/uploads', express.static(path.join(__dirname, 'uploads')));",
+          "app.mount('/exports', StaticFiles(directory='exports'))"
+        ],
+        "no_match": [
+          "app.use('/assets', express.static('public'));"
+        ]
+      }
+    },
+    {
+      "id": "authz-tenant-table-no-rls",
+      "check_id": "AUTHZ-TENANT-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "Tenant-scoped tables without row-level security",
+      "files": [
+        "sql"
+      ],
+      "when": "(?is)create\\s+table[^;]*\\b(tenant_id|org_id|organization_id|workspace_id|account_id|team_id)\\b",
+      "missing": "(?i)enable\\s+row\\s+level\\s+security|create\\s+policy",
+      "confidence": "LOW",
+      "note": "Optional defence in depth: with RLS, a missing WHERE clause cannot leak another tenant's rows.",
+      "examples": {
+        "match": [
+          "CREATE TABLE invoices (\n  id uuid primary key,\n  org_id uuid not null,\n  total numeric\n);"
+        ],
+        "no_match": [
+          "CREATE TABLE invoices (id uuid, org_id uuid);\nALTER TABLE invoices ENABLE ROW LEVEL SECURITY;"
+        ]
+      }
+    },
+    {
+      "id": "authz-role-in-long-token",
+      "check_id": "AUTHZ-FRESH-001",
+      "title": "Roles/permissions embedded in long-lived tokens",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)(sign|encode|create_access_token|generateToken|SignedString)\\([^\\n]*\\b{{ROLE_FIELD}}\\b[^\\n]*(expiresIn|exp|expires_delta|ExpiresAt)\\s*[:=(]\\s*['\\\"]?(\\d+\\s*d|\\d+\\s*days?|[2-9]\\d+\\s*h|\\d{6,}|timedelta\\(\\s*days\\s*=)",
+      "confidence": "LOW",
+      "note": "A demoted user keeps the role until the token expires. Keep tokens short-lived or re-check roles server-side.",
+      "examples": {
+        "match": [
+          "jwt.sign({ sub: u.id, role: u.role }, key, { expiresIn: '30d' });"
+        ],
+        "no_match": [
+          "jwt.sign({ sub: u.id }, key, { expiresIn: '15m' });"
+        ]
+      }
+    },
+    {
+      "id": "authz-no-authz-tests",
+      "check_id": "AUTHZ-TEST-001",
+      "type": "absence",
+      "scope": "project",
+      "title": "No authorization tests found",
+      "files": [
+        "code"
+      ],
+      "when": "{{ROUTE_DEF}}",
+      "missing": "(?i)(\\b403\\b|forbidden|other[ _-]?user|another[ _-]?user|cross[ _-]?tenant|wrong[ _-]?(role|tenant)|unauthori[sz]ed)",
+      "confidence": "LOW",
+      "note": "Test folders are skipped by default; re-run with --include-tests before reporting this.",
+      "examples": {
+        "match": [
+          "router.get('/api/orders/:id', handler);"
+        ],
+        "no_match": [
+          "router.get('/api/orders/:id', handler); // returns 403 for other users"
+        ]
+      }
+    }
+  ]
+}
