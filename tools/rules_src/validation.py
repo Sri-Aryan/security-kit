@@ -1,0 +1,102 @@
+"""sk-validation rules: missing schemas, mass assignment, loose types, numeric checks, formats, deny-lists."""
+
+SKILL = "sk-validation"
+
+MACROS = {
+    "VALIDATOR": r"(?i:zod|\bjoi\b|yup|valibot|ajv|superstruct|class-validator|express-validator|celebrate|typebox|@sinclair/typebox|arktype|pydantic|marshmallow|cerberus|voluptuous|wtforms|serializers\.\w*Serializer|forms\.(Model)?Form|@Valid\b|@Validated|javax\.validation|jakarta\.validation|FluentValidation|DataAnnotations|\[Required\]|go-playground/validator|ozzo-validation|dry-validation|validates\s+:|Validator::make|->validate\(|FormRequest|ValidationPipe|fastify[^\n]*schema|schema\s*:\s*\{\s*(body|querystring|params))",
+}
+
+RULES = [
+    # ------------------------------------------------------------------ SCHEMA
+    {
+        "id": "val-no-validation-library", "check_id": "VAL-SCHEMA-001", "type": "absence", "scope": "project",
+        "title": "Request input used but no validation library or schema found anywhere", "files": ["code", "config"],
+        "when": "{{SRC}}", "missing": "{{VALIDATOR}}", "confidence": "MEDIUM",
+        "examples": {"match": ["app.post('/orders', async (req, res) => { await Order.create({ qty: req.body.qty }); });"],
+                     "no_match": ["import { z } from 'zod';\napp.post('/orders', async (req, res) => { const b = Order.parse(req.body); });"]},
+    },
+    # ------------------------------------------------------------------ MASS
+    {
+        "id": "val-mass-assignment", "check_id": "VAL-MASS-001", "title": "Model created/updated from the whole request", "files": ["code"],
+        "pattern": r"\.(create|insert|insertOne|insertMany|build|save|update|updateOne|updateMany|findOneAndUpdate|findByIdAndUpdate|bulkCreate|upsert|fill|forceFill|update_attributes|assign_attributes|new)\(\s*([^,()\n]*,\s*)?({{SRC_JS}}|request\.(json|data|POST|form)|request\.get_json\(\)|params\.permit!|params\s*\)|\$request->all\(\)|\$_POST|Input::all\(\))\s*\)|\w+\(\s*\*\*\s*(request\.(json|data|POST|form)|request\.get_json\(\))\s*\)|\.\.\.(req\.body|request\.body|ctx\.request\.body)\b",
+        "confidence": "MEDIUM", "note": "Extra fields (role, isAdmin, ownerId, price, balance) get written too. Copy an allow-list of fields or use a strict input DTO.",
+        "examples": {"match": ["const user = await User.create(req.body);", "item = Item(**request.json)", "await db.update(users).set({ ...req.body });"],
+                     "no_match": ["const { name, email } = SignupSchema.parse(req.body);\nconst user = await User.create({ name, email });"]},
+    },
+    {
+        "id": "val-mass-assignment-config", "check_id": "VAL-MASS-001", "title": "Framework mass-assignment protection turned off", "files": ["code"],
+        "pattern": r"params\.permit!|protected\s+\$guarded\s*=\s*\[\s*\]|\$fillable\s*=\s*\[\s*['\"]\*['\"]|Model::unguard\(\)|attr_accessible\s+:all|@JsonIgnoreProperties\(\s*ignoreUnknown\s*=\s*true\s*\)[^\n]*\n[^\n]*@Entity",
+        "confidence": "HIGH",
+        "examples": {"match": ["protected $guarded = [];", "@user.update(params.permit!)"], "no_match": ["protected $fillable = ['name', 'email'];"]},
+    },
+    # ------------------------------------------------------------------ STRICT
+    {
+        "id": "val-schema-allows-unknown", "check_id": "VAL-STRICT-001", "title": "Schema explicitly allows unknown fields", "files": ["code", "config"],
+        "pattern": r"\.passthrough\(\)|\.unknown\(\s*true\s*\)|additionalProperties['\"]?\s*:\s*true|extra\s*=\s*['\"]allow['\"]|Extra\.allow|forbidNonWhitelisted\s*:\s*false|whitelist\s*:\s*false|stripUnknown\s*:\s*false|FAIL_ON_UNKNOWN_PROPERTIES\s*,\s*false",
+        "confidence": "LOW",
+        "examples": {"match": ["const Body = z.object({ name: z.string() }).passthrough();", "model_config = ConfigDict(extra='allow')"],
+                     "no_match": ["const Body = z.object({ name: z.string() }).strict();"]},
+    },
+    {
+        "id": "val-nest-pipe-no-whitelist", "check_id": "VAL-STRICT-001", "type": "absence", "scope": "file",
+        "title": "NestJS ValidationPipe without whitelist", "files": ["js"],
+        "when": r"new\s+ValidationPipe\(", "missing": r"whitelist\s*:\s*true", "confidence": "MEDIUM",
+        "examples": {"match": ["app.useGlobalPipes(new ValidationPipe());"], "no_match": ["app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));"]},
+    },
+    {
+        "id": "val-raw-after-validate", "check_id": "VAL-STRICT-001", "title": "Raw request body used after validating it", "files": ["js"],
+        "pattern": r"\b\w+\.(parse|validate|safeParse|validateSync)\(\s*req\.body\s*\)\s*;?\s*$",
+        "near": {"pattern": r"(create|update|insert|save|set|upsert)\w*\([^\n]*\breq\.body\b(?!\.)", "lines": 4}, "confidence": "MEDIUM",
+        "note": "The validated (and stripped) result is discarded; the raw body, including extra fields, is what gets stored.",
+        "examples": {"match": ["Schema.parse(req.body);\nawait User.update({ where: { id } }, req.body);"],
+                     "no_match": ["const data = Schema.parse(req.body);\nawait User.update({ where: { id } }, data);"]},
+    },
+    # ------------------------------------------------------------------ TYPE
+    {
+        "id": "val-loose-comparison", "check_id": "VAL-TYPE-001", "title": "Loose comparison with request input", "files": ["php", "js"],
+        "pattern": r"(\$_(GET|POST|REQUEST|COOKIE)\[[^\]]+\]|\$request->(input|get|query)\([^)]*\))\s*!?==?(?!=)|!?==?(?!=)\s*(\$_(GET|POST|REQUEST|COOKIE)\[|\$request->(input|get|query)\()|\b(strcmp|in_array)\(\s*[^)]*\$_(GET|POST|REQUEST)|\breq\.(body|query|params)\.\w+\s*!?==(?!=)|[^=!]==\s*req\.(body|query|params)\.",
+        "confidence": "MEDIUM", "note": "PHP '0e123' == '0', arrays passed to strcmp() return null, JS '1' == 1: use strict comparisons and validated types.",
+        "examples": {"match": ["if ($_POST['token'] == $expected) {", "if (strcmp($_GET['pw'], $secret) == 0) {", "if (req.body.pin == user.pin) {"],
+                     "no_match": ["if (hash_equals($expected, (string) $_POST['token'])) {", "if (req.body.pin === user.pin) {"]},
+    },
+    {
+        "id": "val-nested-query-parsing", "check_id": "VAL-TYPE-001", "title": "Query/form parser builds nested objects and arrays from input", "files": ["js"],
+        "pattern": r"urlencoded\(\s*\{\s*extended\s*:\s*true|['\"]query parser['\"]\s*,\s*['\"]extended['\"]|qs\.parse\(\s*(req\.|request\.|ctx\.)",
+        "confidence": "LOW", "note": "?a[b]=1&a[$ne]=x arrives as objects/arrays: validate types before use (see /sk-inject for NoSQL operators).",
+        "examples": {"match": ["app.use(express.urlencoded({ extended: true }));"], "no_match": ["app.use(express.urlencoded({ extended: false }));"]},
+    },
+    # ------------------------------------------------------------------ NUMERIC
+    {
+        "id": "val-number-unchecked", "check_id": "VAL-NUMERIC-001", "title": "Number parsed from input without range/NaN checks", "files": ["code"],
+        "pattern": r"\b(parseInt|parseFloat|Number|int|float|Decimal|BigDecimal|Integer\.parseInt|Double\.parseDouble|strconv\.(Atoi|ParseFloat|ParseInt))\(\s*({{SRC}})[^)\n]*\)",
+        "not_near": {"pattern": r"(?i)isNaN|isFinite|Number\.isInteger|isInteger|Math\.(min|max)|\bmin\(|\bmax\(|clamp|range|validate|schema|\.positive\(|\.int\(|<=?\s*\d|>=?\s*\d|<\s*0|ValueError|NumberFormatException|err\s*!=\s*nil|@Min|@Max|ge\s*=|le\s*=", "lines": 3},
+        "confidence": "LOW",
+        "examples": {"match": ["const qty = parseInt(req.body.qty);\nawait cart.add(item, qty);"],
+                     "no_match": ["const qty = parseInt(req.body.qty, 10);\nif (!Number.isInteger(qty) || qty < 1 || qty > 99) return res.sendStatus(400);"]},
+    },
+    # ------------------------------------------------------------------ FORMAT
+    {
+        "id": "val-weak-email-check", "check_id": "VAL-FORMAT-001", "title": "Email/URL 'validated' with a substring check or loose regex", "files": ["code"],
+        "pattern": r"(?i)\b\w*(email|mail|url|uri|link|website)\w*\s*\.\s*(includes|indexOf|contains|endsWith|startswith|endswith)\(\s*['\"](@|http|\.)|/\\S\+@\\S\+(\\.\\S\+)?/|['\"]@['\"]\s+in\s+\w*(email|mail)",
+        "confidence": "LOW",
+        "examples": {"match": ["if (!email.includes('@')) return res.status(400).end();", "if '@' in email:"],
+                     "no_match": ["const email = z.string().email().max(254).parse(req.body.email);"]},
+    },
+    # ------------------------------------------------------------------ CANON
+    {
+        "id": "val-identifier-no-normalize", "check_id": "VAL-CANON-001", "type": "absence", "scope": "file",
+        "title": "Usernames/emails stored or looked up without normalization", "files": ["code"],
+        "when": r"(?i)(findOne|findUnique|find_by|filter_by|objects\.get|where)\(?[^\n]*\b(email|username|user_?name|handle|login)\b\s*[:=]\s*({{SRC}})",
+        "missing": r"(?i)toLowerCase\(\)|\.lower\(\)|casefold\(|normalize\(\s*['\"]NFK?C|unicodedata\.normalize|strtolower|downcase|EqualFold|ToLowerInvariant|COLLATE|citext|lower\(",
+        "confidence": "LOW", "note": "'Admin@x.com' vs 'admin@x.com' or Unicode lookalikes can create duplicate or confusable accounts.",
+        "examples": {"match": ["const u = await User.findOne({ where: { email: req.body.email } });"], "no_match": ["const email = req.body.email.trim().toLowerCase();\nconst u = await User.findOne({ where: { email } });"]},
+    },
+    # ------------------------------------------------------------------ ALLOW
+    {
+        "id": "val-denylist-filter", "check_id": "VAL-ALLOW-001", "title": "Deny-list filtering of dangerous characters or words", "files": ["code"],
+        "pattern": r"(?i)\.(replace|replaceAll|sub|gsub|str_replace|Replace)\(\s*(/|r?['\"])[^\n]*(<script|script>|\.\./|union\s+select|select\s|drop\s|--|javascript:|onerror|\\\\x00|%00)",
+        "confidence": "MEDIUM", "note": "Deny-lists are always incomplete (<ScRiPt>, ..././, encodings). Validate against what is allowed, and encode/parameterize at the sink.",
+        "examples": {"match": ["const clean = input.replace(/<script>/gi, '');", "name = re.sub(r'(union\\s+select|--)', '', name)"],
+                     "no_match": ["if (!/^[a-z0-9_-]{3,32}$/.test(username)) return res.sendStatus(400);"]},
+    },
+]
