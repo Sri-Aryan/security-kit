@@ -1,0 +1,178 @@
+"""sk-inject rules."""
+
+SKILL = "sk-inject"
+
+MACROS = {
+    "INTERP": r"\+\s*[\w$(]|\$\{|%s|f[\"']|\.format\(|#\{|String\.format|Sprintf|\$\"|\"\s*\.\s*\$|\{\w+\}",
+    "RAW_SQL_API": r"sequelize\.query\(|Sequelize\.literal\(|\bknex\.raw\(|\.(whereRaw|orderByRaw|havingRaw|joinRaw|selectRaw|fromRaw)\(|\$queryRawUnsafe\(|\$executeRawUnsafe\(|\.extra\(|\bRawSQL\(|\.raw\(|DB::(raw|select|statement|unprepared)\(|\bfind_by_sql\(|\bcreateNativeQuery\(|\bcreateQuery\(|\.Raw\(|\.Exec\(|\bFromSqlRaw\(|\bExecuteSqlRaw\(",
+}
+
+RULES = [
+    # ------------------------------------------------------------------ SQL
+    {
+        "id": "inj-sql-concat", "check_id": "INJ-SQL-001", "title": "SQL built by string concatenation",
+        "files": ["code"],
+        "pattern": r"(?i)([\"'])\s*(SELECT\s+[\w*,.\s()]+?\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b(?:(?!\1).)*\1\s*(\+|\.)\s*[\w$(]",
+        "confidence": "HIGH",
+        "examples": {"match": ["const q = 'SELECT * FROM users WHERE id = ' + req.params.id;"], "no_match": ["const q = 'SELECT * FROM users WHERE id = $1';"]},
+    },
+    {
+        "id": "inj-sql-interpolated", "check_id": "INJ-SQL-001", "title": "SQL built with interpolation/formatting",
+        "files": ["code"],
+        "pattern": r"(?i)(`\s*(SELECT\s[^`]*\sFROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^`]*\$\{|\bf\"(SELECT\s[^\"]*\sFROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^\"]*\{|\bf'(SELECT\s[^']*\sFROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^']*\{|[\"'](SELECT\s[^\"']*\sFROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b[^\"']*[\"']\s*(%\s*[\w(]|\.format\()|(Sprintf|String\.format|string\.Format)\(\s*\"(SELECT\s[^\"]*\sFROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)[^\"]*(%[sv]|\{\d\})|\$\"(SELECT\s[^\"]*\sFROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)[^\"]*\{|\"(SELECT\s[^\"]*\sFROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)[^\"]*#\{)",
+        "not_near": {"pattern": r"(\bsql`|Prisma\.sql`|\$queryRaw`|SQL`)", "lines": 0},
+        "confidence": "HIGH",
+        "examples": {"match": ["cur.execute(f\"SELECT * FROM t WHERE a = '{a}'\")", "db.Query(fmt.Sprintf(\"SELECT * FROM t WHERE id = %s\", id))"],
+                     "no_match": ["cur.execute(\"SELECT * FROM t WHERE a = %s\", (a,))"]},
+    },
+    {
+        "id": "inj-sql-identifier", "check_id": "INJ-SQL-002", "title": "SQL identifier/ORDER BY from the request",
+        "files": ["code"],
+        "pattern": r"(?i)(ORDER\s+BY|GROUP\s+BY)\s*[\"'`]?\s*(\+|\$\{(?!\s*[A-Z][A-Z0-9_]*\[)|%s|\{|#\{|\"\s*\.)|\.(order|orderBy|order_by|sort|sortBy)\(\s*({{SRC}})",
+        "near": {"pattern": "{{SRC}}|(?i:sort|order|column|field|direction|dir)", "lines": 3}, "confidence": "MEDIUM",
+        "examples": {"match": ["const q = `SELECT * FROM p ORDER BY ${req.query.sort} ${req.query.dir}`;"], "no_match": ["const q = `SELECT * FROM p ORDER BY ${SORTS[key] ?? 'id'}`;"]},
+    },
+    {
+        "id": "inj-orm-raw", "check_id": "INJ-ORM-001", "title": "ORM raw API with interpolated input", "files": ["code"],
+        "pattern": "{{RAW_SQL_API}}", "near": {"pattern": "{{INTERP}}", "lines": 0},
+        "not_near": {"pattern": r"(\$queryRaw`|\bsql`|Prisma\.sql)", "lines": 0}, "confidence": "HIGH",
+        "examples": {"match": ["await sequelize.query(`SELECT * FROM users WHERE name = '${name}'`)"], "no_match": ["await sequelize.query('SELECT * FROM users WHERE name = ?', { replacements: [name] })"]},
+    },
+    # ------------------------------------------------------------------ NoSQL
+    {
+        "id": "inj-nosql-operator", "check_id": "INJ-NOSQL-001", "title": "Request value used directly in a NoSQL query",
+        "files": ["code"],
+        "pattern": r"\.(find|findOne|findOneAndUpdate|findOneAndDelete|updateOne|updateMany|deleteOne|deleteMany|countDocuments|count|aggregate|find_one|update_one|delete_one|find_one_and_update)\(\s*(\{[^}]*:\s*({{SRC}})|({{SRC}}))",
+        "not_near": {"pattern": r"(String\(|str\(|mongo-sanitize|mongoSanitize|sanitizeFilter|\$eq\s*:)", "lines": 0}, "confidence": "MEDIUM",
+        "examples": {"match": ["await Users.findOne({ email: req.body.email, password: req.body.password });"], "no_match": ["await Users.findOne({ email: String(req.body.email) });"]},
+    },
+    {
+        "id": "inj-nosql-where", "check_id": "INJ-NOSQL-001", "title": "Server-side JavaScript in a NoSQL query", "files": ["code"],
+        "pattern": r"['\"]?\$where['\"]?\s*:|\.mapReduce\(|['\"]\$function['\"]|['\"]\$accumulator['\"]", "confidence": "MEDIUM",
+        "examples": {"match": ["db.users.find({ $where: 'this.age > ' + age })"], "no_match": ["db.users.find({ age: { $gt: age } })"]},
+    },
+    # ------------------------------------------------------------------ CMD / ARG
+    {
+        "id": "inj-cmd-js", "check_id": "INJ-CMD-001", "title": "Shell command built with input (Node.js)", "files": ["js"],
+        "pattern": r"\b(exec|execSync)\(\s*(`[^`]*\$\{|['\"][^'\"]*['\"]\s*\+|\w+\s*\+)|\b(spawn|spawnSync|execFile)\([^)]*shell\s*:\s*true",
+        "confidence": "HIGH",
+        "examples": {"match": ["exec(`convert ${req.query.file} out.png`)", "spawn(cmd, args, { shell: true })"], "no_match": ["execFile('convert', [file, 'out.png'])"]},
+    },
+    {
+        "id": "inj-cmd-py", "check_id": "INJ-CMD-001", "title": "Shell command built with input (Python)", "files": ["py"],
+        "pattern": r"os\.system\(\s*(f['\"]|[^)\"']*\+|['\"][^'\"]*['\"]\s*(%|\.format)|\w+\s*\))|os\.popen\(|subprocess\.\w+\([^)]*shell\s*=\s*True|commands\.getoutput\(",
+        "confidence": "HIGH",
+        "examples": {"match": ["os.system(f'ping -c 1 {host}')", "subprocess.run(cmd, shell=True)"], "no_match": ["subprocess.run(['ping', '-c', '1', host])"]},
+    },
+    {
+        "id": "inj-cmd-other", "check_id": "INJ-CMD-001", "title": "Shell command built with input",
+        "files": ["java", "kt", "go", "php", "rb", "cs"],
+        "pattern": r"Runtime\.getRuntime\(\)\.exec\(\s*[^)]*\+|new\s+ProcessBuilder\(\s*\"(sh|bash|cmd(\.exe)?)\"|exec\.Command\(\s*\"(sh|bash|cmd|powershell)\"\s*,\s*\"(-c|/C)\"|\b(system|exec|shell_exec|passthru|popen|proc_open)\s*\(\s*[^)]*\$|`[^`]*#\{[^}]+\}[^`]*`|%x\{[^}]*#\{|\bsystem\(\s*\"[^\"]*#\{|IO\.popen\(\s*\"[^\"]*#\{|Process\.Start\(\s*\"(cmd|powershell|bash)",
+        "confidence": "HIGH",
+        "examples": {"match": ["exec.Command(\"sh\", \"-c\", \"ping \"+host)", "system(\"convert #{params[:f]} out.png\")"], "no_match": ["exec.Command(\"ping\", \"-c\", \"1\", host)"]},
+    },
+    {
+        "id": "inj-arg-injection", "check_id": "INJ-ARG-001", "title": "Request value passed as a program argument",
+        "files": ["code"],
+        "pattern": r"(execFile|spawn|spawnSync|execFileSync|subprocess\.(run|call|Popen|check_output)|exec\.Command|ProcessBuilder)\(\s*[^)\n]*({{SRC}})",
+        "not_near": {"pattern": r"(['\"]--['\"]|startsWith\(\s*['\"]-|startswith\(\s*['\"]-|^-)", "lines": 2}, "confidence": "LOW",
+        "note": "A value like `--output=/etc/x` or `-oProxyCommand=…` becomes an option; insert `--` before user arguments.",
+        "examples": {"match": ["execFile('git', ['clone', req.body.repo])"], "no_match": ["execFile('git', ['clone', '--', repoUrl])"]},
+    },
+    # ------------------------------------------------------------------ CODE / SSTI / EL
+    {
+        "id": "inj-eval", "check_id": "INJ-CODE-001", "title": "Dynamic code evaluation", "files": ["code"],
+        "pattern": r"\beval\(|new\s+Function\(|\bvm\.(runIn\w+Context|Script|compileFunction)\(|setTimeout\(\s*['\"`]|setInterval\(\s*['\"`]|\bexec\(\s*(compile|f['\"]|[a-z_]+\s*\))|ScriptEngine\w*\.eval\(|\bcreate_function\(|assert\(\s*\$|preg_replace\([^,]*/e['\"]|\binstance_eval\(|\bclass_eval\(|\.constantize\b|\bpublic_send\(\s*params|\bsend\(\s*params",
+        "near": {"pattern": "{{SRC}}|(?i:input|param|body|query|payload|user)", "lines": 3}, "confidence": "HIGH",
+        "examples": {"match": ["const result = eval(req.body.expression);"], "no_match": ["const result = JSON.parse(req.body.json);"]},
+    },
+    {
+        "id": "inj-dynamic-require", "check_id": "INJ-CODE-001", "title": "Module/class loaded by a request-supplied name", "files": ["code"],
+        "pattern": r"\b(require|import|importlib\.import_module|__import__|Class\.forName|Type\.GetType|Activator\.CreateInstance)\s*\(\s*[^)\n]*({{SRC}})|getattr\(\s*\w+\s*,\s*({{SRC}})",
+        "confidence": "HIGH",
+        "examples": {"match": ["const handler = require(`./handlers/${req.params.name}`); // req.params.name", "mod = importlib.import_module(request.args['m'])"], "no_match": ["const handler = handlers[req.params.name] ?? notFound;"]},
+    },
+    {
+        "id": "inj-ssti", "check_id": "INJ-SSTI-001", "title": "Template compiled from user input", "files": ["code"],
+        "pattern": r"(render_template_string|Environment\([^)]*\)\.from_string|jinja2\.Template|Handlebars\.compile|handlebars\.compile|ejs\.render|ejs\.compile|pug\.(render|compile)|nunjucks\.renderString|_\.template|lodash\.template|Velocity\.evaluate|new\s+Template\(|Template\(|ERB\.new|Liquid::Template\.parse|createTemplate\(|template\.New\([^)]*\)\.Parse|Mustache\.render|dot\.template|doT\.template)\s*\(?\s*[^)\n]*({{SRC}})",
+        "confidence": "HIGH",
+        "examples": {"match": ["return render_template_string('Hello ' + request.args['name'])", "const html = ejs.render(req.body.template, data);"], "no_match": ["return render_template('hello.html', name=request.args['name'])"]},
+    },
+    {
+        "id": "inj-ssti-any", "check_id": "INJ-SSTI-001", "title": "render_template_string / string template compilation (verify the source)",
+        "files": ["code"], "pattern": r"render_template_string\(|Environment\([^)]*\)\.from_string\(|Template\(\s*[a-z_]\w*\s*\)\.render", "confidence": "LOW",
+        "examples": {"match": ["render_template_string(tpl)"], "no_match": ["render_template('page.html')"]},
+    },
+    {
+        "id": "inj-expression-language", "check_id": "INJ-EL-001", "title": "Expression language evaluation", "files": ["java", "kt", "scala", "web", "config"],
+        "pattern": r"SpelExpressionParser|parseExpression\(|ExpressionFactory\.createValueExpression|ELProcessor|Ognl\.(getValue|parseExpression)|MVEL\.eval|JexlEngine|createExpression\(|ValueStack\.findValue",
+        "near": {"pattern": "{{SRC}}|(?i:param|input|request|header)", "lines": 4}, "confidence": "HIGH",
+        "examples": {"match": ["Expression e = new SpelExpressionParser().parseExpression(request.getParameter(\"q\"));"], "no_match": ["Expression e = parser.parseExpression(\"price * 2\");"]},
+    },
+    # ------------------------------------------------------------------ LDAP / XPATH / XXE
+    {
+        "id": "inj-ldap", "check_id": "INJ-LDAP-001", "title": "LDAP filter built from input", "files": ["code"],
+        "pattern": r"(?i)[\"'`]\(\s*&?\s*\(?\s*(uid|cn|sAMAccountName|userPrincipalName|mail|member|ou|objectClass)\s*=\s*[\"'`]?\s*(\+|\$\{|%s|\{|#\{|\"\s*\.)|f[\"']\(\s*&?\s*\(?(uid|cn|sAMAccountName|mail)=\{",
+        "not_near": {"pattern": r"(?i)(escape_filter|escapeFilter|ldap\.filter\.escape|LdapEncoder|filter_format|escape_filter_chars|Filter\.create\w*Filter|ldap_escape)", "lines": 2},
+        "confidence": "HIGH",
+        "examples": {"match": ["const filter = '(uid=' + req.body.username + ')';"], "no_match": ["const filter = `(uid=${escapeFilter(username)})`;"]},
+    },
+    {
+        "id": "inj-xpath", "check_id": "INJ-XPATH-001", "title": "XPath built from input", "files": ["code"],
+        "pattern": r"(?i)(xpath(\.\w+)?|select1?|selectNodes|selectSingleNode|evaluate|XPath\.compile|compile|\.find|\.findall)\(\s*[\"'`f][^)\n]*(\+\s*\w|\$\{|%s|\{\w+\}|\.format\()",
+        "file_requires": r"(?i)xpath|lxml|DOMXPath|XPathFactory|selectNodes", "confidence": "MEDIUM",
+        "examples": {"match": ["const node = xpath.select(\"//user[name='\" + name + \"']\", doc);"], "no_match": ["const node = xpath.select(\"//user[name=$name]\", doc, { name });"]},
+    },
+    {
+        "id": "inj-xxe-java", "check_id": "INJ-XXE-001", "title": "XML parser without external entities disabled", "files": ["java", "kt", "cs", "scala"],
+        "pattern": r"(DocumentBuilderFactory|SAXParserFactory|XMLInputFactory|TransformerFactory|SchemaFactory|XMLReaderFactory)\.new\w*\(|new\s+SAXReader\(|new\s+SAXBuilder\(|new\s+XmlDocument\(|DtdProcessing\s*=\s*DtdProcessing\.Parse|XmlResolver\s*=\s*new\s+XmlUrlResolver",
+        "not_near": {"pattern": r"(disallow-doctype-decl|FEATURE_SECURE_PROCESSING|external-general-entities|ACCESS_EXTERNAL_DTD|IS_SUPPORTING_EXTERNAL_ENTITIES|setExpandEntityReferences\(false\)|SUPPORT_DTD|DtdProcessing\.Prohibit|XmlResolver\s*=\s*null)", "lines": 8},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();\nf.newDocumentBuilder().parse(in);"], "no_match": ["DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();\nf.setFeature(\"http://apache.org/xml/features/disallow-doctype-decl\", true);"]},
+    },
+    {
+        "id": "inj-xxe-other", "check_id": "INJ-XXE-001", "title": "XML parsing with entity expansion enabled", "files": ["code"],
+        "pattern": r"resolve_entities\s*=\s*True|no_network\s*=\s*False|\bnoent\s*:\s*true|LIBXML_NOENT|LIBXML_DTDLOAD|Nokogiri::XML\([^)]*\bnoent\b|libxml_disable_entity_loader\(\s*false|XMLParser\(\s*load_dtd\s*=\s*True",
+        "confidence": "HIGH",
+        "examples": {"match": ["const doc = libxmljs.parseXml(body, { noent: true });"], "no_match": ["doc = defusedxml.ElementTree.fromstring(body)"]},
+    },
+    {
+        "id": "inj-xxe-python-stdlib", "check_id": "INJ-XXE-001", "title": "Python XML parsing without defusedxml", "files": ["py"],
+        "pattern": r"^\s*(from\s+xml\.(etree|dom|sax)|import\s+xml\.(etree|dom|sax))|lxml\.etree\.(parse|fromstring|XML)\(", "file_excludes": r"defusedxml",
+        "confidence": "LOW", "note": "Use defusedxml for untrusted XML (entity expansion / billion laughs; lxml resolves entities in older versions).",
+        "examples": {"match": ["import xml.etree.ElementTree as ET"], "no_match": ["import defusedxml.ElementTree as ET"]},
+    },
+    # ------------------------------------------------------------------ HDR / LOG / REGEX
+    {
+        "id": "inj-header-from-input", "check_id": "INJ-HDR-001", "title": "Response header value from the request", "files": ["code"],
+        "pattern": r"(setHeader|writeHead|header|set_header|addHeader|Header\(\)\.(Set|Add)|headers\[[^\]]+\]\s*=|\.append\()\s*\(?\s*[^)\n]*({{SRC}})",
+        "not_near": {"pattern": r"(?i)(replace\(\s*/\[\\r\\n\]|strip|sanitize|encodeURIComponent|quote\()", "lines": 1}, "confidence": "MEDIUM",
+        "examples": {"match": ["res.setHeader('X-Filename', req.query.name);"], "no_match": ["res.setHeader('X-Filename', encodeURIComponent(name));"]},
+    },
+    {
+        "id": "inj-log-forging", "check_id": "INJ-LOG-001", "title": "Request data written to logs unencoded", "files": ["code"],
+        "pattern": r"{{LOG_CALL}}.{0,80}({{SRC}})", "confidence": "LOW",
+        "examples": {"match": ["logger.info('login for ' + req.body.username);"], "no_match": ["logger.info('login for %s', sanitize(username));"]},
+    },
+    {
+        "id": "inj-regex-from-input", "check_id": "INJ-REGEX-001", "title": "Regular expression compiled from user input", "files": ["code"],
+        "pattern": r"new\s+RegExp\(\s*[^)\n]*({{SRC}})|\bre\.(compile|match|search|fullmatch|findall|sub|split)\(\s*({{SRC}})|Pattern\.compile\(\s*[^)\n]*({{SRC}})|regexp\.(Compile|MustCompile)\(\s*[^)\n]*({{SRC}})|preg_(match|replace)\(\s*\$_(GET|POST|REQUEST)|Regex\(\s*[^)\n]*({{SRC}})",
+        "not_near": {"pattern": r"(?i)(escapeRegExp|escape_regex|re\.escape|Pattern\.quote|regexp\.QuoteMeta|preg_quote|Regex\.Escape|lodash\.escapeRegExp)", "lines": 2},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["const re = new RegExp(req.query.pattern);"], "no_match": ["const re = new RegExp(escapeRegExp(req.query.q));"]},
+    },
+    # ------------------------------------------------------------------ PATH / CSV
+    {
+        "id": "inj-path-traversal", "check_id": "INJ-PATH-001", "title": "File path built from request input", "files": ["code"],
+        "pattern": r"(readFile\w*|createReadStream|writeFile\w*|createWriteStream|unlink\w*|rmSync|sendFile|download|res\.sendFile|\bopen\(|send_file\(|send_from_directory\(|FileResponse\(|new\s+File\(|Paths\.get\(|Files\.(read\w*|write\w*|newInputStream|delete)|os\.(Open|ReadFile|Remove|Create)\(|ioutil\.ReadFile\(|file_get_contents\(|fopen\(|include\(|require_once\(|File\.(read|open|delete)\(|path\.join\(|path\.resolve\(|os\.path\.join\(|filepath\.Join\()\s*[^)\n]*({{SRC}})",
+        "not_near": {"pattern": r"(basename|secure_filename|realpath|\.startsWith\(|\.startswith\(|HasPrefix|getCanonicalPath|safe_join|normalize\([^)]*\)\.startsWith|is_relative_to|relative_to)", "lines": 3},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["res.sendFile(path.join(UPLOADS, req.query.name));"], "no_match": ["res.sendFile(path.join(UPLOADS, path.basename(req.query.name)));"]},
+    },
+    {
+        "id": "inj-csv-formula", "check_id": "INJ-CSV-001", "title": "CSV/spreadsheet export without formula neutralization", "type": "absence", "scope": "file",
+        "files": ["code"], "when": r"(?i)(csv-stringify|json2csv|papaparse\.unparse|csv\.writer|DictWriter|to_csv\(|ExcelJS|xlsx\.utils|openpyxl|CSVPrinter|fputcsv|text/csv)",
+        "missing": r"(?i)(formula|['\"]=['\"]|\^\[=+\\-@|startsWith\(\s*['\"][=+@-]|escape_?csv|sanitize_?csv|neutraliz)", "confidence": "LOW",
+        "examples": {"match": ["res.setHeader('Content-Type', 'text/csv'); res.send(json2csv.parse(rows));"], "no_match": ["const safe = (v) => /^[=+\\-@\\t\\r]/.test(v) ? \"'\" + v : v; // formula\nres.send(json2csv.parse(rows.map(clean)));"]},
+    },
+]
