@@ -1,0 +1,224 @@
+{
+  "_generated": "from tools/rules_src/websocket.py; edit the source and run tools/build_rules.py",
+  "macros": {
+    "WS_SERVER": "new\\s+(WebSocketServer|WebSocket\\.Server)\\(|\\bio\\.on\\(\\s*['\\\"]connection|new\\s+Server\\([^)]*\\)\\s*;?\\s*$|@WebSocketGateway|websockets\\.serve\\(|@socketio\\.on\\(\\s*['\\\"]connect|upgrader\\.Upgrade\\(|websocket\\.Accept\\(|@ServerEndpoint|\\.ws\\(\\s*['\\\"]/|MapHub<|AsyncWebsocketConsumer|WebsocketConsumer|app\\.websocket\\(|@app\\.websocket\\(|registerWebSocketHandlers|ActionCable::Channel|socket\\s+['\\\"]/"
+  },
+  "rules": [
+    {
+      "id": "ws-server-no-auth",
+      "check_id": "WS-AUTH-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "WebSocket server/handler with no authentication in sight",
+      "files": [
+        "code"
+      ],
+      "when": "{{WS_SERVER}}",
+      "missing": "(?i)(auth|token|jwt|verify|session|cookie|current_?user|\\.user\\b|login|handshake\\.auth|verifyClient|IsAuthenticated|AuthMiddlewareStack|\\[Authorize\\]|principal|identify)",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const wss = new WebSocketServer({ server });\nwss.on('connection', (ws) => ws.on('message', handle));"
+        ],
+        "no_match": [
+          "const wss = new WebSocketServer({ noServer: true });\nserver.on('upgrade', async (req, sock, head) => { const user = await verifyToken(req); });"
+        ]
+      }
+    },
+    {
+      "id": "ws-token-in-url",
+      "check_id": "WS-AUTH-001",
+      "title": "Auth token passed in the WebSocket URL",
+      "files": [
+        "js",
+        "web",
+        "dart",
+        "swift",
+        "kt"
+      ],
+      "pattern": "(?i)(new\\s+WebSocket|io|connect|WebSocketChannel\\.connect|URLSessionWebSocketTask|webSocket)\\(\\s*[^\\n]*[?&](token|access_token|jwt|auth|apikey|api_key)=",
+      "confidence": "LOW",
+      "note": "URLs are logged by proxies and servers. Prefer a short-lived one-time ticket, a cookie, or the first message / Socket.IO auth payload.",
+      "examples": {
+        "match": [
+          "const ws = new WebSocket(`wss://api.acme.com/ws?token=${jwt}`);"
+        ],
+        "no_match": [
+          "const socket = io(URL, { auth: { token: jwt } });"
+        ]
+      }
+    },
+    {
+      "id": "ws-any-origin",
+      "check_id": "WS-ORIGIN-001",
+      "title": "WebSocket handshake accepts any Origin",
+      "files": [
+        "code",
+        "config"
+      ],
+      "pattern": "CheckOrigin\\s*:\\s*func\\([^)]*\\)\\s*bool\\s*\\{\\s*return\\s+true|InsecureSkipVerify\\s*:\\s*true[^\\n]*Accept|OriginPatterns\\s*:\\s*\\[\\]string\\{\\s*\\\"\\*\\\"|setAllowedOrigins\\(\\s*\\\"\\*\\\"\\s*\\)|setAllowedOriginPatterns\\(\\s*\\\"\\*\\\"\\s*\\)|cors_allowed_origins\\s*=\\s*['\\\"]\\*['\\\"]|ALLOWED_ORIGINS\\s*=\\s*\\[\\s*['\\\"]\\*['\\\"]|cors\\s*:\\s*\\{\\s*origin\\s*:\\s*(['\\\"]\\*['\\\"]|true)",
+      "confidence": "HIGH",
+      "note": "With cookie auth, any website can open a socket as the visiting user (cross-site WebSocket hijacking).",
+      "examples": {
+        "match": [
+          "var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}",
+          "socketio = SocketIO(app, cors_allowed_origins='*')",
+          "const io = new Server(httpServer, { cors: { origin: '*' } });"
+        ],
+        "no_match": [
+          "const io = new Server(httpServer, { cors: { origin: ['https://app.acme.com'] } });"
+        ]
+      }
+    },
+    {
+      "id": "ws-node-no-origin-check",
+      "check_id": "WS-ORIGIN-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "Node ws server without an Origin check",
+      "files": [
+        "js"
+      ],
+      "when": "new\\s+(WebSocketServer|WebSocket\\.Server)\\(",
+      "missing": "(?i)verifyClient|origin|handleUpgrade",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "const wss = new WebSocketServer({ port: 8080 });"
+        ],
+        "no_match": [
+          "const wss = new WebSocketServer({ port: 8080, verifyClient: ({ origin }) => ALLOWED.has(origin) });"
+        ]
+      }
+    },
+    {
+      "id": "ws-join-client-room",
+      "check_id": "WS-AUTHZ-001",
+      "title": "Client chooses the room/channel to join without a permission check",
+      "files": [
+        "code"
+      ],
+      "pattern": "(socket\\.join\\(|join_room\\(|Groups\\.AddToGroupAsync\\(\\s*Context\\.ConnectionId\\s*,|group_add\\(|subscribe\\(|\\.join\\()\\s*(data|msg|message|payload|room|req|args|params|body|event|content)\\b[\\w.\\[\\]'\\\"]*",
+      "not_near": {
+        "pattern": "(?i)(can\\(|authori[sz]e|isMember|is_member|membership|belongs|permission|assert\\w*access|check\\w*access|ownerId|owner_id|user\\.id\\s*===?|allowed)",
+        "lines": 4
+      },
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "socket.on('join', (room) => socket.join(room));",
+          "@socketio.on('join')\ndef on_join(data):\n    join_room(data['room'])"
+        ],
+        "no_match": [
+          "socket.on('join', async (room) => { if (!(await isMember(socket.user.id, room))) return; socket.join(room); });"
+        ]
+      }
+    },
+    {
+      "id": "ws-unguarded-json-parse",
+      "check_id": "WS-INPUT-001",
+      "title": "Message JSON parsed without error handling or validation",
+      "files": [
+        "js"
+      ],
+      "pattern": "on\\(\\s*['\\\"]message['\\\"]\\s*,[^\\n]*JSON\\.parse\\(|onmessage\\s*=[^\\n]*JSON\\.parse\\(",
+      "not_near": {
+        "pattern": "\\btry\\b|safeParse|\\.parse\\(\\s*JSON|schema|validate",
+        "lines": 3
+      },
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "ws.on('message', (raw) => { const msg = JSON.parse(raw); route(msg); });"
+        ],
+        "no_match": [
+          "ws.on('message', (raw) => { try { const msg = Message.parse(JSON.parse(raw)); route(msg); } catch { ws.close(1003); } });"
+        ]
+      }
+    },
+    {
+      "id": "ws-plaintext-url",
+      "check_id": "WS-TLS-001",
+      "title": "Unencrypted ws:// endpoint",
+      "files": [
+        "code",
+        "web",
+        "config",
+        "env"
+      ],
+      "pattern": "['\\\"`=]\\s*ws://(?!localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1\\]|\\$\\{|\\{\\{)",
+      "path_excludes": "(?i)(test|spec|dev|local|example)",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const ws = new WebSocket('ws://realtime.acme.com/feed');"
+        ],
+        "no_match": [
+          "const ws = new WebSocket('wss://realtime.acme.com/feed');",
+          "const ws = new WebSocket('ws://localhost:8080');"
+        ]
+      }
+    },
+    {
+      "id": "ws-no-max-payload",
+      "check_id": "WS-LIMIT-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "WebSocket server without a message size limit",
+      "files": [
+        "js",
+        "go"
+      ],
+      "when": "new\\s+(WebSocketServer|WebSocket\\.Server)\\(|upgrader\\.Upgrade\\(|websocket\\.Accept\\(",
+      "missing": "maxPayload|SetReadLimit|ReadLimit|maxHttpBufferSize|max_size",
+      "confidence": "LOW",
+      "note": "Node ws defaults to 100 MiB per message; gorilla has no limit until SetReadLimit.",
+      "examples": {
+        "match": [
+          "const wss = new WebSocketServer({ server });"
+        ],
+        "no_match": [
+          "const wss = new WebSocketServer({ server, maxPayload: 64 * 1024 });"
+        ]
+      }
+    },
+    {
+      "id": "ws-large-buffer",
+      "check_id": "WS-LIMIT-001",
+      "title": "Very large WebSocket message limit",
+      "files": [
+        "code",
+        "config"
+      ],
+      "pattern": "(maxPayload|maxHttpBufferSize|max_size|MaximumReceiveMessageSize|setMaxTextMessageBufferSize)\\s*[:=(]\\s*(\\d{8,}|\\d+\\s*\\*\\s*1024\\s*\\*\\s*1024\\s*\\*\\s*\\d{2,}|null|None|0\\b)",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "new Server(http, { maxHttpBufferSize: 100000000 })"
+        ],
+        "no_match": [
+          "new Server(http, { maxHttpBufferSize: 1e6 })"
+        ]
+      }
+    },
+    {
+      "id": "ws-broadcast-all",
+      "check_id": "WS-OUTPUT-001",
+      "title": "Message broadcast to every connected client",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\bio\\.emit\\(|\\bwss\\.clients\\.forEach\\(|\\bsocket\\.broadcast\\.emit\\(|emit\\([^\\n]*broadcast\\s*=\\s*True|Clients\\.All\\.SendAsync\\(|\\bbroadcast\\(\\s*['\\\"]|ActionCable\\.server\\.broadcast\\(\\s*['\\\"][a-z_]+['\\\"]\\s*,",
+      "confidence": "LOW",
+      "note": "Confirm the payload is public; per-user data must go to that user's room/connection only.",
+      "examples": {
+        "match": [
+          "io.emit('order:update', order);"
+        ],
+        "no_match": [
+          "io.to(`user:${order.userId}`).emit('order:update', order);"
+        ]
+      }
+    }
+  ]
+}
