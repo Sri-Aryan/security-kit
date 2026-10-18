@@ -10,6 +10,8 @@ const COMMANDS = {
   update: () => require('./commands/update'),
   list: () => require('./commands/list'),
   ls: () => require('./commands/list'),
+  skills: () => require('./commands/skills'),
+  catalog: () => require('./commands/skills'),
   doctor: () => require('./commands/doctor'),
   help: () => require('./commands/help'),
 };
