@@ -1,0 +1,223 @@
+{
+  "_generated": "from tools/rules_src/business.py; edit the source and run tools/build_rules.py",
+  "macros": {
+    "SRC_JS": "\\breq\\.(query|body|params|headers|cookies)|\\brequest\\.(query|body|params)|\\bctx\\.(query|params|request\\.body)|\\bevent\\.(body|queryStringParameters|pathParameters)|searchParams\\.get\\(",
+    "SRC_PY": "\\brequest\\.(args|form|json|values|data|GET|POST|query_params|get_json|files|headers|cookies|path_params|view_args)|\\bself\\.request\\b",
+    "SRC_JAVA": "@RequestParam|@PathVariable|@RequestBody|\\.getParameter\\(|\\.getHeader\\(|\\.getQueryString\\(",
+    "SRC_GO": "\\.URL\\.Query\\(\\)|\\.FormValue\\(|\\.PostFormValue\\(|\\bc\\.(Query|Param|PostForm|DefaultQuery|GetHeader)\\(|mux\\.Vars\\(|chi\\.URLParam\\(",
+    "SRC_PHP": "\\$_(GET|POST|REQUEST|COOKIE|SERVER|FILES)\\b|\\$request->(input|get|query|post)\\(",
+    "SRC_RB": "\\bparams\\[|\\brequest\\.(params|body|headers)",
+    "SRC_CS": "\\bRequest\\.(Query|Form|Headers|Cookies)\\b|\\[From(Query|Body|Route|Form|Header)\\]",
+    "SRC": "{{SRC_JS}}|{{SRC_PY}}|{{SRC_JAVA}}|{{SRC_GO}}|{{SRC_PHP}}|{{SRC_RB}}|{{SRC_CS}}",
+    "MONEY": "(?i:price|amount|total|subtotal|unit_?price|unitPrice|cost|fee|discount|tax|shipping|grand_?total|grandTotal|balance|credit)"
+  },
+  "rules": [
+    {
+      "id": "biz-price-from-request",
+      "check_id": "BIZ-PRICE-001",
+      "title": "Price/amount taken from the request",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\b{{MONEY}}\\w*['\\\"]?\\s*[:=]\\s*(Number\\(|parseFloat\\(|float\\(|Decimal\\(|int\\()?\\s*({{SRC}})",
+      "confidence": "HIGH",
+      "note": "Look the price up server-side from the product/plan ID and recompute the total.",
+      "examples": {
+        "match": [
+          "const order = await Order.create({ productId, price: req.body.price });",
+          "total = float(request.json['total'])"
+        ],
+        "no_match": [
+          "const price = (await Product.findByPk(req.body.productId)).price;"
+        ]
+      }
+    },
+    {
+      "id": "biz-price-from-cart-item",
+      "check_id": "BIZ-PRICE-001",
+      "title": "Line-item price taken from the submitted cart",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\b(item|line|product|cartItem|entry|i)\\.(price|unitPrice|unit_price|amount|cost)\\b",
+      "near": {
+        "pattern": "{{SRC}}|(?i:cart|items|line_?items|body)",
+        "lines": 4
+      },
+      "not_near": {
+        "pattern": "(?i)(findBy|find\\(|lookup|catalog|getProduct|objects\\.get|Product\\.|prices\\.retrieve|db\\.)",
+        "lines": 4
+      },
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const total = req.body.items.reduce((s, item) => s + item.price * item.qty, 0);"
+        ],
+        "no_match": [
+          "const total = items.reduce((s, i) => s + catalog.get(i.id).price * i.qty, 0);"
+        ]
+      }
+    },
+    {
+      "id": "biz-quantity-unvalidated",
+      "check_id": "BIZ-QTY-001",
+      "title": "Quantity/amount from the request without bounds",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\b(quantity|qty|count|units|amount|seats|nights|points)\\w*['\\\"]?\\s*[:=]\\s*(parseInt|Number|int|float|parseFloat|Decimal|toInt)?\\(?\\s*({{SRC}})",
+      "not_near": {
+        "pattern": "(?i)(\\bmin\\b|\\bmax\\b|>\\s*0|>=\\s*1|<\\s*\\d|positive|nonnegative|clamp|validate|z\\.|Field\\(|@Min|@Max|@Positive|gt\\s*=|ge\\s*=|isInt|range\\()",
+        "lines": 3
+      },
+      "confidence": "MEDIUM",
+      "note": "Negative or huge values flip totals, mint credit, or overflow.",
+      "examples": {
+        "match": [
+          "const qty = parseInt(req.body.quantity);"
+        ],
+        "no_match": [
+          "const qty = z.number().int().min(1).max(50).parse(req.body.quantity);"
+        ]
+      }
+    },
+    {
+      "id": "biz-coupon-no-single-use",
+      "check_id": "BIZ-COUPON-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "Coupon/voucher redemption with no usage tracking",
+      "files": [
+        "code"
+      ],
+      "when": "(?i)(coupon|voucher|promo_?code|promoCode|discount_?code|gift_?card|giftCard|referral|redeem)",
+      "file_requires": "(?i)(apply|redeem|use|claim)\\w*\\s*\\(",
+      "missing": "(?i)(used|redeemed|usage|times_?used|max_?uses|uses_?left|remaining|redemptions|unique|transaction|FOR\\s+UPDATE|increment|decrement|\\$inc|atomic|already)",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "async function applyCoupon(code, order) { const c = await Coupon.findOne({ code }); order.discount = c.percent; }"
+        ],
+        "no_match": [
+          "async function applyCoupon(code, order) { await Coupon.update({ used: true }, { where: { code, used: false } }); }"
+        ]
+      }
+    },
+    {
+      "id": "biz-state-from-client",
+      "check_id": "BIZ-FLOW-001",
+      "title": "Workflow state taken from the request",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\b(status|state|step|stage|phase|order_?status|orderStatus|payment_?status|paymentStatus|approved|is_?paid|isPaid|paid|verified|is_?verified|completed)\\b['\\\"]?\\s*[:=]\\s*({{SRC}})",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "order.status = req.body.status;",
+          "booking.paid = request.json['paid']"
+        ],
+        "no_match": [
+          "order.status = transition(order.status, 'ship');"
+        ]
+      }
+    },
+    {
+      "id": "biz-trust-cookie-flag",
+      "check_id": "BIZ-TRUST-001",
+      "title": "Business/authorization flag read from a cookie",
+      "files": [
+        "code"
+      ],
+      "pattern": "(req\\.cookies|request\\.cookies|getCookie|cookies\\.get|Request\\.Cookies)\\W{0,4}(\\.\\s*get\\(\\s*)?['\\\"]?(role|is_?admin|isAdmin|admin|price|discount|plan|tier|is_?premium|isPremium|verified|paid|credits|balance|user_?id|userId)\\b",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "if (req.cookies.isAdmin === 'true') next();"
+        ],
+        "no_match": [
+          "if (req.session.user.role === 'admin') next();"
+        ]
+      }
+    },
+    {
+      "id": "biz-hidden-field-value",
+      "check_id": "BIZ-TRUST-001",
+      "title": "Price/role/ownership in a hidden form field",
+      "files": [
+        "web"
+      ],
+      "pattern": "(?i)type=[\\\"']hidden[\\\"'][^>]*name=[\\\"'](price|amount|total|discount|role|is_?admin|user_?id|owner_?id|plan|tier|tax|shipping)[\\\"']|name=[\\\"'](price|amount|total|discount|role|is_?admin|user_?id|plan)[\\\"'][^>]*type=[\\\"']hidden[\\\"']",
+      "confidence": "MEDIUM",
+      "note": "Fine only if the server ignores the submitted value.",
+      "examples": {
+        "match": [
+          "<input type=\"hidden\" name=\"price\" value=\"{{ product.price }}\">"
+        ],
+        "no_match": [
+          "<input type=\"hidden\" name=\"product_id\" value=\"{{ product.id }}\">"
+        ]
+      }
+    },
+    {
+      "id": "biz-float-money",
+      "check_id": "BIZ-MONEY-001",
+      "title": "Money handled as floating point",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\b\\w*(price|amount|total|balance|cost|fee|tax)\\w*\\s*[:=]\\s*(parseFloat|float)\\(|\\b(double|float)\\s+\\w*(price|amount|total|balance|cost)\\w*\\s*[=;]|\\.toFixed\\(\\s*2\\s*\\)\\s*\\*",
+      "confidence": "LOW",
+      "note": "Use integer minor units (cents) or a decimal type.",
+      "examples": {
+        "match": [
+          "const total = parseFloat(subtotal) * 1.2;",
+          "double orderTotal = 0;"
+        ],
+        "no_match": [
+          "const totalCents = subtotalCents + taxCents;"
+        ]
+      }
+    },
+    {
+      "id": "biz-refund-unbounded",
+      "check_id": "BIZ-REVERSAL-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "Refund logic with no check against the original or already-refunded amount",
+      "files": [
+        "code"
+      ],
+      "when": "(?i)\\brefund\\w*\\s*\\(",
+      "file_requires": "(?i)\\bamount\\b",
+      "missing": "(?i)(amount\\s*[<>]=?|exceed|remaining|refunded_?amount|amount_refunded|already|status\\s*[!=]==?\\s*['\\\"]refunded|max_?refund|refundable)",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "async function refund(orderId, amount) { await stripe.refunds.create({ payment_intent: pi, amount }); }"
+        ],
+        "no_match": [
+          "async function refund(orderId, amount) { if (amount > order.total - order.refundedAmount) throw new Error('exceeds'); }"
+        ]
+      }
+    },
+    {
+      "id": "biz-guessable-code",
+      "check_id": "BIZ-ENUM-001",
+      "title": "Value-bearing code generated predictably",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\b\\w*(coupon|voucher|gift|invite|referral|promo|redeem|claim)\\w*(_?code|Code|_?token|Token)\\w*\\s*[:=]\\s*[^\\n]*(Date\\.now|time\\.time|counter|\\+\\+|\\bcount\\s*\\+|len\\(|\\.length\\s*\\+|uuid1|uuid\\.v1|Math\\.random|random\\.(randint|random|choice))",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const inviteCode = 'INV' + Date.now();"
+        ],
+        "no_match": [
+          "const inviteCode = crypto.randomBytes(12).toString('base64url');"
+        ]
+      }
+    }
+  ]
+}
