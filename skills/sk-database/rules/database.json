@@ -1,0 +1,709 @@
+{
+  "_generated": "from tools/rules_src/database.py; edit the source and run tools/build_rules.py",
+  "macros": {
+    "SRC_JS": "\\breq\\.(query|body|params|headers|cookies)|\\brequest\\.(query|body|params)|\\bctx\\.(query|params|request\\.body)|\\bevent\\.(body|queryStringParameters|pathParameters)|searchParams\\.get\\(",
+    "SRC_PY": "\\brequest\\.(args|form|json|values|data|GET|POST|query_params|get_json|files|headers|cookies|path_params|view_args)|\\bself\\.request\\b",
+    "SRC_JAVA": "@RequestParam|@PathVariable|@RequestBody|\\.getParameter\\(|\\.getHeader\\(|\\.getQueryString\\(",
+    "SRC_GO": "\\.URL\\.Query\\(\\)|\\.FormValue\\(|\\.PostFormValue\\(|\\bc\\.(Query|Param|PostForm|DefaultQuery|GetHeader)\\(|mux\\.Vars\\(|chi\\.URLParam\\(",
+    "SRC_PHP": "\\$_(GET|POST|REQUEST|COOKIE|SERVER|FILES)\\b|\\$request->(input|get|query|post)\\(",
+    "SRC_RB": "\\bparams\\[|\\brequest\\.(params|body|headers)",
+    "SRC_CS": "\\bRequest\\.(Query|Form|Headers|Cookies)\\b|\\[From(Query|Body|Route|Form|Header)\\]",
+    "SRC": "{{SRC_JS}}|{{SRC_PY}}|{{SRC_JAVA}}|{{SRC_GO}}|{{SRC_PHP}}|{{SRC_RB}}|{{SRC_CS}}",
+    "DB_HINT": "(?i:db|database|postgres|mysql|maria|mongo|redis|sql|pool|connection|sequelize|knex|prisma|typeorm|mikro|gorm|hibernate|jdbc|datasource|sqlalchemy|django|psycopg|elastic)",
+    "RAW_API": "sequelize\\.query\\(|Sequelize\\.literal\\(|\\bknex\\.raw\\(|\\.(whereRaw|orderByRaw|havingRaw|joinRaw|selectRaw|fromRaw)\\(|\\$queryRawUnsafe\\(|\\$executeRawUnsafe\\(|\\.extra\\(|\\bRawSQL\\(|\\.raw\\(|DB::(raw|select|statement|unprepared)\\(|\\bfind_by_sql\\(|\\bcreateNativeQuery\\(|\\bcreateQuery\\(|\\.Raw\\(|\\.Exec\\(|\\bFromSqlRaw\\(|\\bExecuteSqlRaw\\(|\\bcursor\\.execute\\(|\\bconnection\\.execute\\(|\\bexecuteQuery\\(|\\bexecuteUpdate\\(|\\bstatement\\.execute\\(|\\bdb\\.(query|execute|run|all|get|exec)\\(|\\bpool\\.query\\(|\\bclient\\.query\\(",
+    "INTERP": "\\+\\s*\\w|\\$\\{|%s|f[\\\"']|\\.format\\(|#\\{|String\\.format|Sprintf|\\$\\\"|\\\"\\s*\\.\\s*\\$|\\{\\w+\\}"
+  },
+  "rules": [
+    {
+      "id": "db-sql-concat-dq",
+      "check_id": "DB-QUERY-001",
+      "title": "SQL built by string concatenation",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\\"\\s*(SELECT\\s+[\\w*,.\\s()]+?\\s+FROM|INSERT\\s+INTO|UPDATE\\s+\\w+\\s+SET|DELETE\\s+FROM)\\b[^\\\"\\n]*\\\"\\s*(\\+|\\.)\\s*[\\w$(]",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "String q = \"SELECT * FROM users WHERE name = '\" + name + \"'\";"
+        ],
+        "no_match": [
+          "String q = \"SELECT * FROM users WHERE name = ?\";"
+        ]
+      }
+    },
+    {
+      "id": "db-sql-concat-sq",
+      "check_id": "DB-QUERY-001",
+      "title": "SQL built by string concatenation",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)'\\s*(SELECT\\s+[\\w*,.\\s()]+?\\s+FROM|INSERT\\s+INTO|UPDATE\\s+\\w+\\s+SET|DELETE\\s+FROM)\\b[^'\\n]*'\\s*(\\+|\\.)\\s*[\\w$(]",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "const q = 'DELETE FROM orders WHERE id = ' + req.params.id;"
+        ],
+        "no_match": [
+          "const q = 'DELETE FROM orders WHERE id = $1';"
+        ]
+      }
+    },
+    {
+      "id": "db-sql-template-literal",
+      "check_id": "DB-QUERY-001",
+      "title": "SQL built with template-literal interpolation",
+      "files": [
+        "js"
+      ],
+      "pattern": "(?i)`\\s*(SELECT\\s[^`]*\\sFROM|INSERT\\s+INTO|UPDATE\\s+\\w+\\s+SET|DELETE\\s+FROM)\\b[^`]*\\$\\{",
+      "not_near": {
+        "pattern": "(\\bsql`|Prisma\\.sql`|\\$queryRaw`|\\bsql\\.raw|\\bsql\\(|SQL`)",
+        "lines": 0
+      },
+      "confidence": "HIGH",
+      "note": "Tagged templates such as sql`...` or $queryRaw`...` parameterise safely; plain template strings do not.",
+      "examples": {
+        "match": [
+          "await pool.query(`SELECT * FROM users WHERE email = '${email}'`);"
+        ],
+        "no_match": [
+          "await prisma.$queryRaw`SELECT * FROM users WHERE email = ${email}`;"
+        ]
+      }
+    },
+    {
+      "id": "db-sql-python-format",
+      "check_id": "DB-QUERY-001",
+      "title": "SQL built with f-string, % or .format()",
+      "files": [
+        "py"
+      ],
+      "pattern": "(?i)\\bf[\\\"'](SELECT\\s[^\\\"']*\\sFROM|INSERT\\s+INTO|UPDATE\\s+\\w+\\s+SET|DELETE\\s+FROM)\\b[^\\\"']*\\{|[\\\"'](SELECT\\s[^\\\"']*\\sFROM|INSERT\\s+INTO|UPDATE\\s+\\w+\\s+SET|DELETE\\s+FROM)\\b[^\\\"']*[\\\"']\\s*(%\\s*[\\w(]|\\.format\\()",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "cur.execute(f\"SELECT * FROM users WHERE id = {user_id}\")",
+          "cur.execute(\"SELECT * FROM t WHERE a = '%s'\" % a)"
+        ],
+        "no_match": [
+          "cur.execute(\"SELECT * FROM users WHERE id = %s\", (user_id,))"
+        ]
+      }
+    },
+    {
+      "id": "db-sql-format-func",
+      "check_id": "DB-QUERY-001",
+      "title": "SQL built with Sprintf / String.format / interpolation",
+      "files": [
+        "go",
+        "java",
+        "kt",
+        "cs",
+        "rb",
+        "php",
+        "scala"
+      ],
+      "pattern": "(?i)(Sprintf|String\\.format|string\\.Format)\\(\\s*\\\"(SELECT\\s[^\\\"]*\\sFROM|INSERT\\s+INTO|UPDATE\\s+\\w+\\s+SET|DELETE\\s+FROM)[^\\\"]*%[sv]|\\$\\\"(SELECT\\s[^\\\"]*\\sFROM|INSERT\\s+INTO|UPDATE\\s+\\w+\\s+SET|DELETE\\s+FROM)[^\\\"]*\\{|\\\"(SELECT\\s[^\\\"]*\\sFROM|INSERT\\s+INTO|UPDATE\\s+\\w+\\s+SET|DELETE\\s+FROM)[^\\\"]*#\\{",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "q := fmt.Sprintf(\"SELECT * FROM users WHERE id = %s\", id)",
+          "var q = $\"SELECT * FROM Users WHERE Name = '{name}'\";"
+        ],
+        "no_match": [
+          "db.Query(\"SELECT * FROM users WHERE id = $1\", id)"
+        ]
+      }
+    },
+    {
+      "id": "db-dynamic-identifier",
+      "check_id": "DB-QUERY-002",
+      "title": "ORDER BY / identifier taken from the request",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)(ORDER\\s+BY|GROUP\\s+BY|FROM|JOIN)\\s*[\\\"'`]?\\s*(\\+|\\$\\{|%s|\\{|#\\{|\\\"\\s*\\.)|\\.(order|orderBy|order_by|sort)\\(\\s*({{SRC}})",
+      "near": {
+        "pattern": "{{SRC}}|(?i:sort|order|column|field|table)",
+        "lines": 3
+      },
+      "confidence": "MEDIUM",
+      "note": "Identifiers cannot be bound as parameters; map the input to an allow-list of column names.",
+      "examples": {
+        "match": [
+          "const q = `SELECT * FROM items ORDER BY ${req.query.sort}`;",
+          "Post.order(params[:sort])"
+        ],
+        "no_match": [
+          "const q = 'SELECT * FROM items ORDER BY created_at DESC';"
+        ]
+      }
+    },
+    {
+      "id": "db-raw-api-interpolated",
+      "check_id": "DB-QUERY-003",
+      "title": "ORM raw/unsafe API with interpolated input",
+      "files": [
+        "code"
+      ],
+      "pattern": "{{RAW_API}}",
+      "near": {
+        "pattern": "{{INTERP}}",
+        "lines": 0
+      },
+      "not_near": {
+        "pattern": "(\\$queryRaw`|\\bsql`|Prisma\\.sql)",
+        "lines": 0
+      },
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "await sequelize.query(\"SELECT * FROM users WHERE name = '\" + name + \"'\")",
+          "User.objects.raw(f\"SELECT * FROM auth_user WHERE username = '{u}'\")"
+        ],
+        "no_match": [
+          "await sequelize.query('SELECT * FROM users WHERE name = ?', { replacements: [name] })"
+        ]
+      }
+    },
+    {
+      "id": "db-raw-api-site",
+      "check_id": "DB-QUERY-003",
+      "title": "Raw query site: confirm it is parameterised",
+      "files": [
+        "code"
+      ],
+      "pattern": "sequelize\\.query\\(|Sequelize\\.literal\\(|\\bknex\\.raw\\(|\\.(whereRaw|orderByRaw|havingRaw|joinRaw|selectRaw)\\(|\\$queryRawUnsafe\\(|\\$executeRawUnsafe\\(|\\.extra\\(|\\bRawSQL\\(|\\.objects\\.raw\\(|DB::(raw|unprepared)\\(|\\bfind_by_sql\\(|\\bcreateNativeQuery\\(|\\bFromSqlRaw\\(|\\bExecuteSqlRaw\\(",
+      "not_near": {
+        "pattern": "{{INTERP}}",
+        "lines": 0
+      },
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "const rows = await knex.raw('select * from t where id = ?', [id]);"
+        ],
+        "no_match": [
+          "const rows = await knex('t').where({ id });"
+        ]
+      }
+    },
+    {
+      "id": "db-dynamic-sql-in-sql",
+      "check_id": "DB-QUERY-004",
+      "title": "Dynamic SQL built inside a stored procedure or SQL script",
+      "files": [
+        "sql"
+      ],
+      "pattern": "(?i)\\b(EXEC(UTE)?\\s*\\(\\s*['@]|EXEC(UTE)?\\s+sp_executesql\\s+@\\w+|EXECUTE\\s+IMMEDIATE|EXECUTE\\s+format\\(|PREPARE\\s+\\w+\\s+FROM\\s+@)",
+      "near": {
+        "pattern": "(\\+\\s*@|\\|\\||CONCAT\\(|%s|%I|format\\()",
+        "lines": 3
+      },
+      "confidence": "MEDIUM",
+      "note": "Use sp_executesql with parameters, or format() with %I/%L and USING for values.",
+      "examples": {
+        "match": [
+          "SET @sql = 'SELECT * FROM t WHERE name = ''' + @name + '''';\nEXEC (@sql);"
+        ],
+        "no_match": [
+          "EXEC sp_executesql N'SELECT * FROM t WHERE name = @n', N'@n nvarchar(50)', @n = @name;"
+        ]
+      }
+    },
+    {
+      "id": "db-nosql-operator-from-request",
+      "check_id": "DB-NOSQL-001",
+      "title": "Request value used directly in a NoSQL query",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\.(find|findOne|findOneAndUpdate|findOneAndDelete|updateOne|updateMany|deleteOne|deleteMany|countDocuments|count|aggregate|find_one|update_one|delete_one|find_one_and_update)\\(\\s*(\\{[^}]*:\\s*({{SRC}})|({{SRC}}))",
+      "not_near": {
+        "pattern": "(String\\(|str\\(|mongo-sanitize|mongoSanitize|sanitizeFilter|\\$eq\\s*:)",
+        "lines": 0
+      },
+      "confidence": "MEDIUM",
+      "note": "A JSON body {\"$ne\": null} becomes a query operator. Cast to string or use $eq / sanitizeFilter.",
+      "examples": {
+        "match": [
+          "const u = await Users.findOne({ email: req.body.email, password: req.body.password });",
+          "user = db.users.find_one(request.json)"
+        ],
+        "no_match": [
+          "const u = await Users.findOne({ email: String(req.body.email) });"
+        ]
+      }
+    },
+    {
+      "id": "db-nosql-server-js",
+      "check_id": "DB-NOSQL-001",
+      "title": "Server-side JavaScript in a NoSQL query",
+      "files": [
+        "code"
+      ],
+      "pattern": "['\\\"]?\\$where['\\\"]?\\s*:|\\.mapReduce\\(|['\\\"]\\$function['\\\"]|['\\\"]\\$accumulator['\\\"]|\\.\\$where\\(",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "db.users.find({ $where: 'this.age > ' + age })"
+        ],
+        "no_match": [
+          "db.users.find({ age: { $gt: age } })"
+        ]
+      }
+    },
+    {
+      "id": "db-redis-eval-interpolated",
+      "check_id": "DB-NOSQL-001",
+      "title": "Redis EVAL script built from input",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\.(eval|evalsha|EVAL|Eval)\\(\\s*(`[^`]*\\$\\{|['\\\"][^'\\\"]*['\\\"]\\s*\\+|f['\\\"])",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "await redis.eval(`return redis.call('get', '${key}')`, 0)"
+        ],
+        "no_match": [
+          "await redis.eval(script, 1, key)"
+        ]
+      }
+    },
+    {
+      "id": "db-lookup-by-id-unscoped",
+      "check_id": "DB-SCOPE-001",
+      "title": "Record loaded by a request ID without an owner/tenant condition",
+      "files": [
+        "code"
+      ],
+      "pattern": "(findById|findByPk|findUnique|get_object_or_404|objects\\.get|findOne|find_by|\\.find\\(|\\.First\\(|\\.Find\\()\\s*\\(?[^)\\n]*\\b(req\\.params|params\\[|request\\.(args|view_args|match_info)|kwargs\\[|\\b\\w*_?[iI]d\\b|\\bpk\\s*=)",
+      "near": {
+        "pattern": "{{SRC}}|(?i:params|kwargs|path)",
+        "lines": 2
+      },
+      "not_near": {
+        "pattern": "(?i)(user_?id|owner|tenant|account_?id|org_?id|req\\.user|request\\.user|current_?user|session|auth\\.|claims|\\.where\\(.*user)",
+        "lines": 2
+      },
+      "confidence": "LOW",
+      "note": "Fine for public records; otherwise add the owner/tenant to the query or check after loading.",
+      "examples": {
+        "match": [
+          "const order = await Order.findByPk(req.params.id);"
+        ],
+        "no_match": [
+          "const order = await Order.findOne({ where: { id: req.params.id, userId: req.user.id } });"
+        ]
+      }
+    },
+    {
+      "id": "db-unbounded-query",
+      "check_id": "DB-SCOPE-002",
+      "title": "Unbounded query on a request path",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\.(findAll|findMany|find)\\(\\s*(\\)|\\{\\s*\\}\\s*\\))|\\.objects\\.all\\(\\)(?!\\[)|\\.all\\(\\)\\s*$|SELECT\\s+[\\w*,\\s]+\\s+FROM\\s+\\w+\\s*['\\\"`;]",
+      "path_includes": "(?i)(route|controller|handler|view|api|resolver|endpoint|server)",
+      "not_near": {
+        "pattern": "(?i)(limit|take|paginate|page|slice|\\[:\\d+\\]|LIMIT|first\\()",
+        "lines": 2
+      },
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "router.get('/', async (req, res) => res.json(await User.findAll()))"
+        ],
+        "no_match": [
+          "res.json(await User.findAll({ limit: 50, offset }))"
+        ]
+      }
+    },
+    {
+      "id": "db-bulk-without-filter",
+      "check_id": "DB-SCOPE-003",
+      "title": "Bulk delete/update with an empty filter or without WHERE",
+      "files": [
+        "code",
+        "sql"
+      ],
+      "pattern": "(?i)\\b(DELETE\\s+FROM|UPDATE)\\s+\\w+(\\s+SET\\s+(?:(?!WHERE)[^;'\\\"`])*)?\\s*;?\\s*['\\\"`]|\\.(deleteMany|updateMany|destroy|delete_many|update_many)\\(\\s*\\{\\s*\\}\\s*[,)]|destroy\\(\\s*\\{\\s*where\\s*:\\s*\\{\\s*\\}|truncate\\s*:\\s*true|\\.objects\\.all\\(\\)\\.(delete|update)\\(|\\.delete_all\\b|\\.update_all\\(",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "await Session.deleteMany({});",
+          "db.execute('DELETE FROM sessions;')"
+        ],
+        "no_match": [
+          "await Session.deleteMany({ userId });"
+        ]
+      }
+    },
+    {
+      "id": "db-read-modify-write",
+      "check_id": "DB-TXN-001",
+      "title": "Read-modify-write of a balance/stock value without a transaction or atomic update",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\b(balance|stock|inventory|quantity|qty|credits?|points|seats|remaining|available)\\b\\s*(-=|\\+=|=\\s*\\w+(\\.\\w+)*\\.(balance|stock|inventory|quantity|qty|credits?|points|seats|remaining|available)\\s*[-+])",
+      "not_near": {
+        "pattern": "(?i)(transaction|atomic|BEGIN|FOR\\s+UPDATE|select_for_update|\\block\\b|\\$transaction|withTransaction|@Transactional|\\.Transaction\\(|increment\\(|decrement\\(|\\bF\\(|\\$inc|SKIP\\s+LOCKED|optimistic|version)",
+        "lines": 8
+      },
+      "confidence": "MEDIUM",
+      "note": "Two concurrent requests can both read the old value (double spend / oversell).",
+      "examples": {
+        "match": [
+          "const acct = await Account.findByPk(id);\nacct.balance = acct.balance - amount;\nawait acct.save();"
+        ],
+        "no_match": [
+          "await sequelize.transaction(async (t) => {\n  acct.balance = acct.balance - amount;\n});"
+        ]
+      }
+    },
+    {
+      "id": "db-select-star",
+      "check_id": "DB-EXPOSE-001",
+      "title": "SELECT * (all columns) in application code",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)['\\\"`]\\s*SELECT\\s+\\*\\s+FROM",
+      "confidence": "LOW",
+      "note": "Returning whole rows tends to leak new sensitive columns as the schema grows.",
+      "examples": {
+        "match": [
+          "db.all('SELECT * FROM users WHERE id = ?', [id])"
+        ],
+        "no_match": [
+          "db.all('SELECT id, name FROM users WHERE id = ?', [id])"
+        ]
+      }
+    },
+    {
+      "id": "db-port-published",
+      "check_id": "DB-NET-001",
+      "title": "Database/cache port published on all interfaces",
+      "files": [
+        "docker",
+        "config"
+      ],
+      "pattern": "^\\s*-\\s*['\\\"]?(0\\.0\\.0\\.0:)?(5432|3306|3307|27017|27018|6379|6380|9200|9300|5984|11211|1433|1521|9042|7687|8086|26257|5433|8529|28015)\\s*:\\s*\\d+['\\\"]?\\s*$",
+      "confidence": "MEDIUM",
+      "note": "Bind to 127.0.0.1:PORT:PORT or do not publish; Docker bypasses host firewalls.",
+      "examples": {
+        "match": [
+          "    ports:\n      - \"5432:5432\""
+        ],
+        "no_match": [
+          "    ports:\n      - \"127.0.0.1:5432:5432\""
+        ]
+      }
+    },
+    {
+      "id": "db-bind-all-interfaces",
+      "check_id": "DB-NET-001",
+      "title": "Database configured to listen on all interfaces",
+      "files": [
+        "config",
+        "any"
+      ],
+      "pattern": "(?i)^\\s*(bind\\s+0\\.0\\.0\\.0|bindIp\\s*:\\s*0\\.0\\.0\\.0|bindIpAll\\s*:\\s*true|listen_addresses\\s*=\\s*'\\*'|bind-address\\s*=\\s*0\\.0\\.0\\.0|network\\.host\\s*:\\s*0\\.0\\.0\\.0|protected-mode\\s+no)",
+      "path_includes": "(?i)(redis\\.conf|mongod\\.conf|postgresql\\.conf|my\\.cnf|mysqld\\.cnf|elasticsearch\\.ya?ml|\\.conf$)",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "bind 0.0.0.0",
+          "listen_addresses = '*'"
+        ],
+        "no_match": [
+          "bind 127.0.0.1"
+        ]
+      }
+    },
+    {
+      "id": "db-admin-tool-exposed",
+      "check_id": "DB-NET-002",
+      "title": "Database admin UI deployed",
+      "files": [
+        "docker",
+        "config"
+      ],
+      "pattern": "(?i)image\\s*:\\s*['\\\"]?[\\w./-]*(phpmyadmin|dpage/pgadmin|adminer|mongo-express|redis-commander|rediscommander|kibana|dbgate|cloudbeaver)",
+      "confidence": "MEDIUM",
+      "note": "Fine on a developer laptop; never publicly reachable without strong auth.",
+      "examples": {
+        "match": [
+          "  adminer:\n    image: adminer:4"
+        ],
+        "no_match": [
+          "  db:\n    image: postgres:16"
+        ]
+      }
+    },
+    {
+      "id": "db-tls-disabled",
+      "check_id": "DB-TLS-001",
+      "title": "Database connection without TLS or certificate verification",
+      "files": [
+        "any"
+      ],
+      "pattern": "(?i)sslmode\\s*=\\s*(disable|allow|prefer)\\b|[?&]ssl(mode)?=(false|0|disable)|\\bssl['\\\"]?\\s*:\\s*(false|False)\\b|useSSL\\s*=\\s*false|requireSSL\\s*=\\s*false|Encrypt\\s*=\\s*(False|no)\\b|TrustServerCertificate\\s*=\\s*(True|yes)\\b|\\btls['\\\"]?\\s*:\\s*(false|False)\\b|ssl_mode\\s*[:=]\\s*['\\\"]?(disable|DISABLED)|rejectUnauthorized['\\\"]?\\s*:\\s*false|tlsAllowInvalidCertificates\\s*=\\s*true|ssl_cert_reqs\\s*=\\s*ssl\\.CERT_NONE|verify_server_cert\\s*=\\s*False",
+      "near": {
+        "pattern": "{{DB_HINT}}",
+        "lines": 6
+      },
+      "confidence": "MEDIUM",
+      "path_excludes": "(?i)\\.(md|txt|rst|adoc)$",
+      "note": "Acceptable for a local container on the same host; required for anything crossing a network.",
+      "examples": {
+        "match": [
+          "DATABASE_URL=postgres://u@db.prod:5432/app?sslmode=disable",
+          "const pool = new Pool({ ssl: { rejectUnauthorized: false } }) // postgres"
+        ],
+        "no_match": [
+          "DATABASE_URL=postgres://u@db:5432/app?sslmode=verify-full"
+        ]
+      }
+    },
+    {
+      "id": "db-no-auth-store",
+      "check_id": "DB-AUTH-001",
+      "title": "Data store started without authentication",
+      "files": [
+        "docker",
+        "config",
+        "shell"
+      ],
+      "pattern": "(?i)--noauth\\b|ALLOW_EMPTY_PASSWORD\\s*[:=]\\s*['\\\"]?(yes|true|1)|MYSQL_ALLOW_EMPTY_PASSWORD|POSTGRES_HOST_AUTH_METHOD\\s*[:=]\\s*['\\\"]?trust|xpack\\.security\\.enabled\\s*[:=]\\s*['\\\"]?false|^\\s*host\\s+all\\s+all\\s+\\S+\\s+trust\\b|redis-server(?![^\\n]*requirepass)\\s*(--|$)",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "      POSTGRES_HOST_AUTH_METHOD: trust",
+          "      - xpack.security.enabled=false"
+        ],
+        "no_match": [
+          "      POSTGRES_PASSWORD_FILE: /run/secrets/db"
+        ]
+      }
+    },
+    {
+      "id": "db-default-password",
+      "check_id": "DB-AUTH-002",
+      "title": "Default or weak database password",
+      "files": [
+        "any"
+      ],
+      "pattern": "(?i)(POSTGRES_PASSWORD|MYSQL_ROOT_PASSWORD|MYSQL_PASSWORD|MARIADB_ROOT_PASSWORD|MONGO_INITDB_ROOT_PASSWORD|DB_PASS(WORD)?|DATABASE_PASSWORD|SA_PASSWORD|MSSQL_SA_PASSWORD|REDIS_PASSWORD|requirepass)['\\\"]?(\\s*[:=]\\s*|\\s+)['\\\"]?(postgres|root|password|admin|123456|changeme|secret|example|test|mysql|mongo|redis|sa|pass|foobared|P@ssw0rd|Passw0rd!?)['\\\"]?\\s*$",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "      POSTGRES_PASSWORD: postgres",
+          "requirepass foobared"
+        ],
+        "no_match": [
+          "      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}"
+        ]
+      }
+    },
+    {
+      "id": "db-credentials-in-url",
+      "check_id": "DB-CRED-001",
+      "title": "Database credentials embedded in a connection string",
+      "files": [
+        "any"
+      ],
+      "redact": 2,
+      "pattern": "\\b(postgres(?:ql)?|mysql|mariadb|mongodb(?:\\+srv)?|redis|rediss|mssql|sqlserver|oracle|cockroachdb)://[^\\s:'\\\"/@]+:(?!\\$\\{|\\{\\{|<|%)([^\\s'\\\"@/]{3,})@",
+      "path_excludes": "(?i)(\\.example$|\\.sample$|\\.template$|README|\\.md$)",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "const url = 'postgres://app:Sup3rS3cret@db.internal:5432/app';"
+        ],
+        "no_match": [
+          "const url = `postgres://app:${process.env.DB_PASSWORD}@db/app`;"
+        ]
+      }
+    },
+    {
+      "id": "db-credentials-in-code",
+      "check_id": "DB-CRED-001",
+      "title": "Database password literal in code/config",
+      "files": [
+        "code",
+        "config"
+      ],
+      "redact": 3,
+      "pattern": "(?i)\\b(db_?pass(word)?|database_?password|datasource\\.password|(mysql|postgres|pg|mongo|redis)_?pass(word)?)['\\\"]?\\s*[:=]\\s*['\\\"](?!\\$\\{|\\{\\{|<)([^'\\\"\\s]{4,})['\\\"]",
+      "path_excludes": "(?i)(\\.example$|\\.sample$|\\.template$)",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "DB_PASSWORD = 'hunter22'",
+          "spring.datasource.password='x9Kq2m'"
+        ],
+        "no_match": [
+          "DB_PASSWORD = os.environ['DB_PASSWORD']"
+        ]
+      }
+    },
+    {
+      "id": "db-superuser",
+      "check_id": "DB-PRIV-001",
+      "title": "Application connects as a database superuser",
+      "files": [
+        "any"
+      ],
+      "pattern": "(?i)://(root|postgres|sa|admin|administrator|sys|system)(:|@)|\\b(DB_USER(NAME)?|DATABASE_USER|POSTGRES_USER|MYSQL_USER|datasource\\.username|user(name)?|User\\s*Id|UID)['\\\"]?\\s*[:=]\\s*['\\\"]?(root|postgres|sa|sys|system)['\\\"]?\\s*([,;]|$|//|#)",
+      "near": {
+        "pattern": "{{DB_HINT}}|(?i:jdbc|uri|url)",
+        "lines": 6
+      },
+      "confidence": "MEDIUM",
+      "note": "Container bootstrap users (POSTGRES_USER for the image) are fine if the app uses a separate restricted account.",
+      "examples": {
+        "match": [
+          "DATABASE_URL=mysql://root:pw@db:3306/app",
+          "    user: 'postgres',  // pg pool"
+        ],
+        "no_match": [
+          "DATABASE_URL=postgres://app_rw:pw@db:5432/app"
+        ]
+      }
+    },
+    {
+      "id": "db-dangerous-features",
+      "check_id": "DB-HARD-001",
+      "title": "Dangerous database feature enabled",
+      "files": [
+        "any"
+      ],
+      "pattern": "(?i)sp_configure\\s+'(xp_cmdshell|clr enabled|Ole Automation Procedures)'\\s*,\\s*1|GRANT\\s+FILE\\s+ON|local[-_]infile\\s*=\\s*(1|ON|true)|allowLoadLocalInfile\\s*[:=]\\s*true|LOAD\\s+DATA\\s+LOCAL\\s+INFILE|COPY\\s+\\w+\\s+(FROM|TO)\\s+PROGRAM|javascriptEnabled\\s*:\\s*true|enable-scripting|script\\.allowed_types",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "EXEC sp_configure 'xp_cmdshell', 1;",
+          "const conn = mysql.createConnection({ localInfile: true, allowLoadLocalInfile: true })"
+        ],
+        "no_match": [
+          "EXEC sp_configure 'xp_cmdshell', 0;"
+        ]
+      }
+    },
+    {
+      "id": "db-schema-auto-sync",
+      "check_id": "DB-HARD-002",
+      "title": "Schema auto-sync / drop on startup",
+      "files": [
+        "code",
+        "config"
+      ],
+      "pattern": "\\.sync\\(\\s*\\{\\s*(force|alter)\\s*:\\s*true|synchronize\\s*:\\s*true|ddl-auto\\s*[=:]\\s*(create|create-drop|update)\\b|hbm2ddl\\.auto\\s*[=:]\\s*['\\\"]?(create|create-drop|update)|dropSchema\\s*:\\s*true|\\bdrop_all\\(|metadata\\.drop_all\\(|\\.AutoMigrate\\(|migrate\\(\\s*\\{\\s*force",
+      "confidence": "MEDIUM",
+      "note": "Fine for tests and local dev; in production it can drop or alter live tables.",
+      "examples": {
+        "match": [
+          "await sequelize.sync({ force: true });",
+          "spring.jpa.hibernate.ddl-auto=update"
+        ],
+        "no_match": [
+          "spring.jpa.hibernate.ddl-auto=validate"
+        ]
+      }
+    },
+    {
+      "id": "db-plaintext-sensitive-column",
+      "check_id": "DB-DATA-001",
+      "title": "Sensitive column stored as plain text",
+      "files": [
+        "code",
+        "sql"
+      ],
+      "pattern": "(?i)\\b(ssn|social_?security\\w*|card_?number|credit_?card\\w*|cvv|iban|tax_?id|passport\\w*|api_?key|secret\\w*|access_?token|refresh_?token|totp_?secret|mfa_?secret)\\b['\\\"]?\\s*[:=]?\\s*(Column\\(|models\\.(Char|Text)Field|DataTypes\\.(STRING|TEXT)|\\{\\s*type\\s*:\\s*(String|DataTypes)|varchar|VARCHAR|TEXT\\b|text\\b|@Column|String\\s*@)",
+      "not_near": {
+        "pattern": "(?i)(encrypt|Encrypted|hash|cipher|vault|kms|digest)",
+        "lines": 1
+      },
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "  api_key = Column(String(64))",
+          "  card_number VARCHAR(19),"
+        ],
+        "no_match": [
+          "  api_key_hash = Column(String(64))"
+        ]
+      }
+    },
+    {
+      "id": "db-dump-in-repo",
+      "check_id": "DB-BACKUP-001",
+      "title": "Database dump with real-looking data committed",
+      "files": [
+        "sql",
+        "any"
+      ],
+      "path_includes": "(?i)\\.(sql|dump|bak|backup)(\\.gz)?$",
+      "path_excludes": "(?i)(migrat|schema|seed|fixture|init|test|docker-entrypoint)",
+      "pattern": "(?i)INSERT\\s+INTO[^\\n]*(@[\\w-]+\\.[a-z]{2,}|\\$2[aby]\\$\\d\\d\\$|\\b\\d{3}-\\d{2}-\\d{4}\\b)|^COPY\\s+[^\\n]+FROM\\s+stdin|^-- (PostgreSQL|MySQL) database dump",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "INSERT INTO users VALUES (1,'alice@corp.com','$2b$12$abcdefghijklmnopqrstuv');",
+          "-- PostgreSQL database dump"
+        ],
+        "no_match": [
+          "CREATE TABLE users (id int);"
+        ]
+      }
+    },
+    {
+      "id": "db-error-to-client",
+      "check_id": "DB-ERR-001",
+      "title": "Database error details returned to the client",
+      "files": [
+        "code"
+      ],
+      "pattern": "(res\\.(status\\(\\d+\\)\\.)?(json|send)|return\\s+[^\\n]*(jsonify|JsonResponse|Response|HttpResponse|ResponseEntity)|c\\.(JSON|String)\\(|ctx\\.body\\s*=)[^\\n]*\\b(err|error|e|ex|exc)\\.(sqlMessage|sql\\b|sqlState|original|parent|detail|code)\\b",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "res.status(500).json({ error: err.sqlMessage })"
+        ],
+        "no_match": [
+          "res.status(500).json({ error: 'Internal error', id: reqId })"
+        ]
+      }
+    },
+    {
+      "id": "db-query-logging",
+      "check_id": "DB-LOG-001",
+      "title": "SQL logging with parameters enabled",
+      "files": [
+        "code",
+        "config"
+      ],
+      "pattern": "(?i)logging\\s*:\\s*(console\\.log|true)\\b|\\becho\\s*=\\s*True|log_statement\\s*=\\s*'?all|show[-_]sql\\s*[=:]\\s*true|format_sql\\s*[=:]\\s*true|\\.LogMode\\(\\s*true\\s*\\)|logger\\.Info\\)|EnableSensitiveDataLogging\\(|['\\\"]django\\.db\\.backends['\\\"]\\s*:\\s*\\{[^}]*DEBUG|log_queries\\s*[:=]\\s*true|debug\\s*:\\s*true[^\\n]*(knex|prisma|typeorm)",
+      "near": {
+        "pattern": "{{DB_HINT}}|(?i:jpa|hibernate|log_statement|EntityFramework|DbContext)",
+        "lines": 6
+      },
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const sequelize = new Sequelize(url, { logging: console.log });",
+          "engine = create_engine(DB_URL, echo=True)"
+        ],
+        "no_match": [
+          "const sequelize = new Sequelize(url, { logging: false });"
+        ]
+      }
+    }
+  ]
+}
