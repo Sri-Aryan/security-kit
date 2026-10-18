@@ -1,0 +1,303 @@
+{
+  "_generated": "from tools/rules_src/dos.py; edit the source and run tools/build_rules.py",
+  "macros": {
+    "SRC_JS": "\\breq\\.(query|body|params|headers|cookies)|\\brequest\\.(query|body|params)|\\bctx\\.(query|params|request\\.body)|\\bevent\\.(body|queryStringParameters|pathParameters)|searchParams\\.get\\(",
+    "SRC_PY": "\\brequest\\.(args|form|json|values|data|GET|POST|query_params|get_json|files|headers|cookies|path_params|view_args)|\\bself\\.request\\b",
+    "SRC_JAVA": "@RequestParam|@PathVariable|@RequestBody|\\.getParameter\\(|\\.getHeader\\(|\\.getQueryString\\(",
+    "SRC_GO": "\\.URL\\.Query\\(\\)|\\.FormValue\\(|\\.PostFormValue\\(|\\bc\\.(Query|Param|PostForm|DefaultQuery|GetHeader)\\(|mux\\.Vars\\(|chi\\.URLParam\\(",
+    "SRC_PHP": "\\$_(GET|POST|REQUEST|COOKIE|SERVER|FILES)\\b|\\$request->(input|get|query|post)\\(",
+    "SRC_RB": "\\bparams\\[|\\brequest\\.(params|body|headers)",
+    "SRC_CS": "\\bRequest\\.(Query|Form|Headers|Cookies)\\b|\\[From(Query|Body|Route|Form|Header)\\]",
+    "SRC": "{{SRC_JS}}|{{SRC_PY}}|{{SRC_JAVA}}|{{SRC_GO}}|{{SRC_PHP}}|{{SRC_RB}}|{{SRC_CS}}"
+  },
+  "rules": [
+    {
+      "id": "dos-large-body-limit",
+      "check_id": "DOS-BODY-001",
+      "title": "Very large or unlimited request body size",
+      "files": [
+        "code",
+        "config"
+      ],
+      "pattern": "(?i)(limit\\s*:\\s*['\\\"]\\d{2,}\\s*mb['\\\"]|limit\\s*:\\s*['\\\"]\\d+\\s*gb['\\\"]|client_max_body_size\\s+(0|\\d{3,}m|\\d+g)\\s*;|MaxRequestBodySize\\s*=\\s*(null|long\\.MaxValue)|DATA_UPLOAD_MAX_MEMORY_SIZE\\s*=\\s*None|DATA_UPLOAD_MAX_NUMBER_FIELDS\\s*=\\s*None|max-http-(post|request)-size\\s*[=:]\\s*-1|maxRequestLength=\\\"\\d{7,}\\\"|bodyLimit\\s*:\\s*\\d{9,}|LimitRequestBody\\s+0\\b|max_content_length\\s*=\\s*None)",
+      "confidence": "MEDIUM",
+      "note": "Big uploads belong on a dedicated route (or direct-to-storage); keep the default JSON limit small (e.g. 100kb-1mb).",
+      "examples": {
+        "match": [
+          "app.use(express.json({ limit: '50mb' }));",
+          "client_max_body_size 0;",
+          "DATA_UPLOAD_MAX_MEMORY_SIZE = None"
+        ],
+        "no_match": [
+          "app.use(express.json({ limit: '100kb' }));"
+        ]
+      }
+    },
+    {
+      "id": "dos-limit-from-request",
+      "check_id": "DOS-PAGE-001",
+      "title": "Page size taken from the request without a maximum",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\b(limit|take|top|size|per_?page|page_?size|first|max_?results)\\s*[:=]\\s*(parseInt\\(|Number\\(|int\\(|Integer\\.parseInt\\(|strconv\\.Atoi\\(|\\+)?\\s*({{SRC}})[\\w.\\[\\]'\\\"]*",
+      "not_near": {
+        "pattern": "(?i)Math\\.min|\\bmin\\(|clamp|MAX_\\w*(LIMIT|PAGE|SIZE)|max_?limit|maxLimit|\\.max\\(\\s*\\d|le\\s*=\\s*\\d|lte\\s*:\\s*\\d|@Max\\(|Max\\s*\\(|Query\\([^)]*le=|<=\\s*\\d{2,}|>\\s*\\d{2,}",
+        "lines": 3
+      },
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const rows = await db.user.findMany({ take: Number(req.query.limit) });",
+          "limit = int(request.args.get('limit', 20))\nreturn Item.query.limit(limit).all()"
+        ],
+        "no_match": [
+          "const take = Math.min(Number(req.query.limit) || 20, 100);"
+        ]
+      }
+    },
+    {
+      "id": "dos-input-sized-work",
+      "check_id": "DOS-COMPLEX-001",
+      "title": "Loop, allocation or repetition sized by request input",
+      "files": [
+        "code"
+      ],
+      "pattern": "(new\\s+Array\\(|Array\\.from\\(\\s*\\{\\s*length\\s*:|\\.repeat\\(|range\\(\\s*(int\\()?|for\\s*\\([^;]*;\\s*\\w+\\s*<\\s*|Buffer\\.alloc(Unsafe)?\\(|bytearray\\(|make\\(\\[\\][\\w.]+,\\s*|new\\s+byte\\[|\\*\\s*)\\s*(parseInt\\(|Number\\(|int\\()?\\s*({{SRC}})",
+      "not_near": {
+        "pattern": "(?i)Math\\.min|\\bmin\\(|clamp|MAX_\\w+|max_\\w+|\\.max\\(|<=\\s*\\d|>\\s*\\d|le\\s*=",
+        "lines": 3
+      },
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const pad = ' '.repeat(req.query.width);",
+          "for i in range(int(request.args['n'])):",
+          "const buf = Buffer.alloc(Number(req.body.size));"
+        ],
+        "no_match": [
+          "const n = Math.min(Number(req.query.n), 100);\nfor (let i = 0; i < n; i++) {}"
+        ]
+      }
+    },
+    {
+      "id": "dos-password-hash-unbounded",
+      "check_id": "DOS-COMPLEX-001",
+      "title": "Slow password hash on input with no length limit",
+      "type": "absence",
+      "scope": "file",
+      "files": [
+        "code"
+      ],
+      "when": "(bcrypt|argon2|scrypt|pbkdf2)\\w*\\.(hash|compare|verify)\\w*\\(\\s*[^,)]*({{SRC}})|check_password\\(|password_verify\\(",
+      "missing": "(?i)(max_?length|maxLength|\\.max\\(\\s*\\d+|len\\([^)]*\\)\\s*>|\\.length\\s*>|MAX_PASSWORD|\\[:\\d+\\]|@Size\\(|StringLength\\()",
+      "confidence": "LOW",
+      "note": "Very long passwords make hashing expensive (and bcrypt truncates at 72 bytes); cap input length (e.g. 128).",
+      "examples": {
+        "match": [
+          "const ok = await bcrypt.compare(req.body.password, user.hash);"
+        ],
+        "no_match": [
+          "const pw = z.string().max(128).parse(req.body.password);\nconst ok = await bcrypt.compare(req.body.password, user.hash);"
+        ]
+      }
+    },
+    {
+      "id": "dos-catastrophic-regex",
+      "check_id": "DOS-REGEX-001",
+      "title": "Regex with nested quantifiers (catastrophic backtracking)",
+      "files": [
+        "code"
+      ],
+      "pattern": "(/|r?['\\\"])[^/'\\\"\\n]*\\((\\.\\*|\\.\\+|\\\\w\\+|\\\\w\\*|\\\\s\\*|\\\\d\\+|\\[[^\\]]+\\][+*]|[a-z]\\+)[^()\\n]{0,10}\\)[+*][^/'\\\"\\n]*(/[gimsuy]*|['\\\"])",
+      "near": {
+        "pattern": "\\.(test|match|exec|search|replace|split)\\(|re\\.(match|search|fullmatch|findall|sub|compile)\\(|Pattern\\.compile|Regex\\(|regexp\\.(MustCompile|Compile)|preg_match",
+        "lines": 2
+      },
+      "confidence": "MEDIUM",
+      "note": "Inputs like 'aaaa…!' take exponential time. Rewrite without nested quantifiers, cap input length, or use RE2.",
+      "examples": {
+        "match": [
+          "const emailRe = /^([a-zA-Z0-9]+)*@example\\.com$/;\nif (emailRe.test(input)) ok();",
+          "PAT = re.compile(r'^(\\w+\\s?)*$')\nPAT.match(name)"
+        ],
+        "no_match": [
+          "const emailRe = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+$/;\nif (emailRe.test(input)) ok();"
+        ]
+      }
+    },
+    {
+      "id": "dos-unbounded-decompress",
+      "check_id": "DOS-DECOMPRESS-001",
+      "title": "Decompression without a maximum output size",
+      "files": [
+        "code"
+      ],
+      "pattern": "zlib\\.(gunzipSync|inflateSync|unzipSync|brotliDecompressSync|gunzip|inflate|unzip)\\(|createGunzip\\(\\)|gzip\\.decompress\\(|zlib\\.decompress\\(|bz2\\.decompress\\(|lzma\\.decompress\\(|gzip\\.NewReader\\(|zlib\\.NewReader\\(|GZIPInputStream\\(|InflaterInputStream\\(|GZipStream\\(|DeflateStream\\(|Zlib::Inflate\\.inflate\\(|gzinflate\\(|gzdecode\\(",
+      "not_near": {
+        "pattern": "(?i)maxOutputLength|max_length|io\\.LimitReader|LimitedReader|BoundedInputStream|maxsize|max_size|MAX_\\w*(SIZE|BYTES)|\\.read\\(\\s*\\d+|limit",
+        "lines": 4
+      },
+      "confidence": "MEDIUM",
+      "note": "A few KB of compressed input can expand to gigabytes. Cap the decompressed size.",
+      "examples": {
+        "match": [
+          "const data = zlib.gunzipSync(req.body);",
+          "zr, _ := gzip.NewReader(r.Body)\nio.ReadAll(zr)"
+        ],
+        "no_match": [
+          "const data = zlib.gunzipSync(req.body, { maxOutputLength: 1e6 });",
+          "zr, _ := gzip.NewReader(r.Body)\nio.ReadAll(io.LimitReader(zr, 1<<20))"
+        ]
+      }
+    },
+    {
+      "id": "dos-image-pixel-limit-off",
+      "check_id": "DOS-DECOMPRESS-001",
+      "title": "Image decompression-bomb protection disabled",
+      "files": [
+        "code"
+      ],
+      "pattern": "Image\\.MAX_IMAGE_PIXELS\\s*=\\s*None|limitInputPixels\\s*:\\s*false|limitInputPixels\\s*:\\s*0\\b|failOn\\s*:\\s*['\\\"]none['\\\"]",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "Image.MAX_IMAGE_PIXELS = None",
+          "sharp(buf, { limitInputPixels: false })"
+        ],
+        "no_match": [
+          "sharp(buf, { limitInputPixels: 40_000_000 })"
+        ]
+      }
+    },
+    {
+      "id": "dos-http-no-timeout-py",
+      "check_id": "DOS-TIMEOUT-001",
+      "title": "Outbound HTTP call without a timeout (Python requests)",
+      "files": [
+        "py"
+      ],
+      "pattern": "\\brequests\\.(get|post|put|patch|delete|head|request)\\((?![^)\\n]*\\btimeout\\s*=)[^)\\n]*\\)",
+      "confidence": "MEDIUM",
+      "note": "requests has no default timeout: a slow upstream ties up a worker forever.",
+      "examples": {
+        "match": [
+          "r = requests.get(url)"
+        ],
+        "no_match": [
+          "r = requests.get(url, timeout=10)"
+        ]
+      }
+    },
+    {
+      "id": "dos-http-no-timeout-go",
+      "check_id": "DOS-TIMEOUT-001",
+      "title": "Go default HTTP client/server without timeouts",
+      "files": [
+        "go"
+      ],
+      "pattern": "\\bhttp\\.(Get|Post|Head|PostForm)\\(|&?http\\.Client\\{\\s*\\}|http\\.ListenAndServe(TLS)?\\(",
+      "confidence": "LOW",
+      "note": "http.DefaultClient and http.ListenAndServe have no timeouts; use a Client with Timeout and an http.Server with Read/Write/Idle timeouts.",
+      "examples": {
+        "match": [
+          "resp, err := http.Get(url)",
+          "log.Fatal(http.ListenAndServe(\":8080\", mux))"
+        ],
+        "no_match": [
+          "client := &http.Client{Timeout: 10 * time.Second}\nresp, err := client.Get(url)"
+        ]
+      }
+    },
+    {
+      "id": "dos-fetch-no-timeout",
+      "check_id": "DOS-TIMEOUT-001",
+      "title": "Server-side fetch/axios call with no timeout in the file",
+      "type": "absence",
+      "scope": "file",
+      "files": [
+        "js"
+      ],
+      "when": "\\bfetch\\(\\s*[`'\\\"]?https?:|\\baxios(\\.(get|post|put|request))?\\(|\\bgot(\\.\\w+)?\\(",
+      "file_requires": "(?i)express|fastify|koa|next/server|NextResponse|app\\.(get|post)|router\\.|export\\s+async\\s+function\\s+(GET|POST)|handler",
+      "missing": "(?i)timeout|AbortSignal\\.timeout|AbortController|signal\\s*:",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "router.get('/rates', async (req, res) => {\n  const r = await fetch('https://api.rates.example/latest');\n  res.json(await r.json());\n});"
+        ],
+        "no_match": [
+          "router.get('/rates', async (req, res) => {\n  const r = await fetch('https://api.rates.example/latest', { signal: AbortSignal.timeout(5000) });\n  res.json(await r.json());\n});"
+        ]
+      }
+    },
+    {
+      "id": "dos-global-map-from-input",
+      "check_id": "DOS-RESOURCE-001",
+      "title": "Module-level map/cache grown with request-controlled keys",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\b(cache|store|memo|seen|sessions|map|registry|buffer|queue|pending)\\w*\\s*(\\[\\s*({{SRC}})[^\\]]*\\]\\s*=|\\.(set|add|push|append|setdefault)\\(\\s*({{SRC}}))",
+      "not_near": {
+        "pattern": "(?i)lru|LRUCache|maxSize|max_size|maxsize|ttl|expire|TimedCache|cachetools|\\.delete\\(|evict|limit",
+        "lines": 6
+      },
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "cache[req.query.key] = await compute(req.query.key);"
+        ],
+        "no_match": [
+          "const cache = new LRUCache({ max: 1000 });\ncache.set(req.query.key, await compute(req.query.key));"
+        ]
+      }
+    },
+    {
+      "id": "dos-sync-expensive-work",
+      "check_id": "DOS-COST-001",
+      "title": "Expensive work done synchronously inside a request",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\b(generatePdf|renderPdf|pdfkit|puppeteer\\.launch|chromium\\.launch|wkhtmltopdf|exportCsv|export_to_csv|generate_report|generateReport|ffmpeg|sharp\\(|ImageMagick|convert\\s+-|zipAll|archiver\\(|createZip|sendBulk|bulkSend|send_mass_mail)\\b",
+      "near": {
+        "pattern": "(?i)(app|router)\\.(get|post)\\(|@(app|router)\\.(get|post)|@(Get|Post)Mapping|def\\s+\\w+\\(\\s*request|async\\s+function\\s+(GET|POST)",
+        "lines": 15
+      },
+      "not_near": {
+        "pattern": "(?i)queue|enqueue|\\.add\\(|celery|delay\\(|apply_async|bull|sidekiq|perform_later|background|worker|job|semaphore|p-limit|concurrency",
+        "lines": 15
+      },
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "router.post('/reports', async (req, res) => {\n  const browser = await puppeteer.launch();\n  res.send(await render(browser));\n});"
+        ],
+        "no_match": [
+          "router.post('/reports', async (req, res) => {\n  await reportQueue.add('render', { user: req.user.id });\n  res.status(202).end();\n});"
+        ]
+      }
+    },
+    {
+      "id": "dos-infinite-retry",
+      "check_id": "DOS-RETRY-001",
+      "title": "Unbounded retries",
+      "files": [
+        "code",
+        "config"
+      ],
+      "pattern": "(?i)\\b(retries|maxRetries|max_retries|retry|attempts|maxAttempts|max_attempts|retryLimit)\\s*[:=]\\s*(Infinity|-1|math\\.inf|float\\(['\\\"]inf['\\\"]\\)|Number\\.MAX_SAFE_INTEGER|Integer\\.MAX_VALUE)\\b",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const client = new Client({ retries: Infinity });",
+          "max_retries = -1"
+        ],
+        "no_match": [
+          "const client = new Client({ retries: 3 });"
+        ]
+      }
+    }
+  ]
+}
