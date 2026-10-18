@@ -1,0 +1,463 @@
+{
+  "_generated": "from tools/rules_src/cloud.py; edit the source and run tools/build_rules.py",
+  "macros": {
+    "PLACEHOLDER": "(?i:\\$\\{|\\{\\{|<|%\\(|process\\.env|os\\.environ|getenv|changeme|change_me|change-me|example|placeholder|your[_-]|xxx|dummy|sample|todo|redacted|\\*\\*\\*|test|fake|invalid|wrong|probe|https?://|/|\\./)",
+    "OPEN_CIDR": "(?:['\\\"]0\\.0\\.0\\.0/0['\\\"]|['\\\"]::/0['\\\"]|\\bInternet\\b|['\\\"]\\*['\\\"])",
+    "ADMIN_PORT": "(?:22|3389|3306|5432|1433|1521|6379|11211|27017|9200|9300|5601|2375|2376|6443|10250|5984|8086|9042|7000|5000)"
+  },
+  "rules": [
+    {
+      "id": "cloud-bucket-public-acl",
+      "check_id": "CLOUD-STORAGE-001",
+      "title": "Bucket/object ACL grants public access",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)\\bacl\\s*[:=]\\s*['\\\"](public-read|public-read-write|authenticated-read)['\\\"]|AccessControl\\s*:\\s*(PublicRead|PublicReadWrite|AuthenticatedRead)|['\\\"](allUsers|allAuthenticatedUsers)['\\\"]|publicAccess\\s*[:=]\\s*['\\\"]?(Blob|Container)['\\\"]?|allowBlobPublicAccess\\s*[:=]\\s*true|allow_nested_items_to_be_public\\s*=\\s*true|PredefinedAcl\\.PublicRead|BucketAccessControl\\.PUBLIC_READ\\w*",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "resource \"aws_s3_bucket_acl\" \"a\" {\n  bucket = aws_s3_bucket.b.id\n  acl    = \"public-read\"\n}",
+          "member = \"allUsers\""
+        ],
+        "no_match": [
+          "acl = \"private\""
+        ]
+      }
+    },
+    {
+      "id": "cloud-public-access-block-off",
+      "check_id": "CLOUD-STORAGE-001",
+      "title": "S3 public access block disabled",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)\\b(block_public_acls|block_public_policy|ignore_public_acls|restrict_public_buckets|BlockPublicAcls|BlockPublicPolicy|IgnorePublicAcls|RestrictPublicBuckets|blockPublicAcls|blockPublicPolicy)\\s*[:=]\\s*false",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "  block_public_policy = false"
+        ],
+        "no_match": [
+          "  block_public_policy = true"
+        ]
+      }
+    },
+    {
+      "id": "cloud-iam-wildcard-action",
+      "check_id": "CLOUD-IAM-001",
+      "title": "IAM policy allows all actions or all resources",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)(\\\"?actions?\\\"?\\s*[:=]\\s*\\[?\\s*['\\\"]\\*['\\\"]|\\\"?Action\\\"?\\s*:\\s*\\[?\\s*['\\\"]?\\*['\\\"]?\\s*\\]?\\s*,?\\s*$|actions\\s*:\\s*\\[\\s*['\\\"]\\*['\\\"]|['\\\"]\\w+:\\*['\\\"])",
+      "near": {
+        "pattern": "(?i)allow|policy|statement|iam",
+        "lines": 6
+      },
+      "not_near": {
+        "pattern": "(?i)\\\"?effect\\\"?\\s*[:=]\\s*['\\\"]?deny",
+        "lines": 3
+      },
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "statement {\n  effect    = \"Allow\"\n  actions   = [\"*\"]\n  resources = [\"*\"]\n}",
+          "Statement:\n  - Effect: Allow\n    Action: \"s3:*\""
+        ],
+        "no_match": [
+          "statement {\n  effect    = \"Allow\"\n  actions   = [\"s3:GetObject\"]\n  resources = [\"arn:aws:s3:::b/*\"]\n}"
+        ]
+      }
+    },
+    {
+      "id": "cloud-admin-policy-attached",
+      "check_id": "CLOUD-IAM-001",
+      "title": "Administrator/owner role attached",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "arn:aws:iam::aws:policy/(AdministratorAccess|PowerUserAccess|IAMFullAccess)|['\\\"]roles/(owner|editor)['\\\"]|roleDefinitionName\\s*[:=]\\s*['\\\"](Owner|Contributor)['\\\"]|['\\\"]Owner['\\\"]\\s*\\)?\\s*$|ManagedPolicy\\.fromAwsManagedPolicyName\\(\\s*['\\\"](AdministratorAccess|PowerUserAccess)['\\\"]",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "policy_arn = \"arn:aws:iam::aws:policy/AdministratorAccess\"",
+          "role = \"roles/owner\""
+        ],
+        "no_match": [
+          "policy_arn = aws_iam_policy.read_only.arn"
+        ]
+      }
+    },
+    {
+      "id": "cloud-wildcard-principal",
+      "check_id": "CLOUD-IAM-001",
+      "title": "Resource policy with a wildcard principal",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)\\\"?Principal\\\"?\\s*[:=]\\s*(\\{\\s*\\\"?AWS\\\"?\\s*[:=]\\s*)?['\\\"]\\*['\\\"]|principals\\s*\\{\\s*[^}]*identifiers\\s*=\\s*\\[\\s*['\\\"]\\*['\\\"]",
+      "not_near": {
+        "pattern": "(?i)condition|aws:SourceArn|aws:SourceAccount|aws:PrincipalOrgID|aws:SourceVpce",
+        "lines": 8
+      },
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "  \"Principal\": \"*\",\n  \"Action\": \"sqs:SendMessage\""
+        ],
+        "no_match": [
+          "  \"Principal\": { \"Service\": \"sns.amazonaws.com\" },"
+        ]
+      }
+    },
+    {
+      "id": "cloud-open-admin-port",
+      "check_id": "CLOUD-NET-001",
+      "title": "Admin/database port open to the internet",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)(from_port|FromPort|port|destination_port_range|destinationPortRange|ports)\\s*[:=]\\s*\\[?\\s*['\\\"]?{{ADMIN_PORT}}['\\\"]?\\b",
+      "near": {
+        "pattern": "{{OPEN_CIDR}}|cidr_blocks\\s*=\\s*\\[\\s*['\"]0\\.0\\.0\\.0/0|CidrIp\\s*:\\s*0\\.0\\.0\\.0/0|source_address_prefix\\s*=\\s*['\"](\\*|Internet|0\\.0\\.0\\.0/0)|source_ranges\\s*=\\s*\\[\\s*['\"]0\\.0\\.0\\.0/0",
+        "lines": 6
+      },
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "ingress {\n  from_port   = 22\n  to_port     = 22\n  protocol    = \"tcp\"\n  cidr_blocks = [\"0.0.0.0/0\"]\n}"
+        ],
+        "no_match": [
+          "ingress {\n  from_port   = 22\n  to_port     = 22\n  protocol    = \"tcp\"\n  cidr_blocks = [\"10.0.0.0/16\"]\n}"
+        ]
+      }
+    },
+    {
+      "id": "cloud-all-ports-open",
+      "check_id": "CLOUD-NET-001",
+      "title": "All ports/protocols open to the internet",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)(protocol|IpProtocol)\\s*[:=]\\s*['\\\"]?(-1|all|\\*)['\\\"]?",
+      "near": {
+        "pattern": "(?i)(cidr_blocks\\s*=\\s*\\[\\s*['\\\"]0\\.0\\.0\\.0/0|CidrIp\\s*:\\s*0\\.0\\.0\\.0/0|source_ranges\\s*=\\s*\\[\\s*['\\\"]0\\.0\\.0\\.0/0|source_address_prefix\\s*=\\s*['\\\"](\\*|Internet))",
+        "lines": 5
+      },
+      "not_near": {
+        "pattern": "(?i)\\begress\\b|SecurityGroupEgress",
+        "lines": 5
+      },
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "ingress {\n  from_port   = 0\n  to_port     = 0\n  protocol    = \"-1\"\n  cidr_blocks = [\"0.0.0.0/0\"]\n}"
+        ],
+        "no_match": [
+          "egress {\n  from_port   = 0\n  to_port     = 0\n  protocol    = \"-1\"\n  cidr_blocks = [\"0.0.0.0/0\"]\n}"
+        ]
+      }
+    },
+    {
+      "id": "cloud-db-public",
+      "check_id": "CLOUD-DB-001",
+      "title": "Managed database publicly accessible",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)(publicly_accessible|PubliclyAccessible|publiclyAccessible)\\s*[:=]\\s*true|public_network_access_enabled\\s*=\\s*true|ipv4_enabled\\s*=\\s*true|authorized_networks\\s*\\{[^}]*0\\.0\\.0\\.0/0",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "resource \"aws_db_instance\" \"db\" {\n  publicly_accessible = true\n}"
+        ],
+        "no_match": [
+          "  publicly_accessible = false"
+        ]
+      }
+    },
+    {
+      "id": "cloud-db-no-deletion-protection",
+      "check_id": "CLOUD-DB-001",
+      "title": "Database without deletion protection or with backups off",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)(deletion_protection|DeletionProtection|deletionProtection)\\s*[:=]\\s*false|(backup_retention_period|BackupRetentionPeriod)\\s*[:=]\\s*['\\\"]?0\\b|skip_final_snapshot\\s*=\\s*true",
+      "path_excludes": "(?i)(dev|test|sandbox|example)",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "  skip_final_snapshot = true",
+          "  backup_retention_period = 0"
+        ],
+        "no_match": [
+          "  backup_retention_period = 14"
+        ]
+      }
+    },
+    {
+      "id": "cloud-encryption-off",
+      "check_id": "CLOUD-ENC-001",
+      "title": "Encryption at rest explicitly disabled",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)\\b(storage_encrypted|encrypted|StorageEncrypted|Encrypted|encryption_enabled|enable_encryption|kms_encrypted|server_side_encryption_enabled|EncryptionEnabled|at_rest_encryption_enabled)\\s*[:=]\\s*false",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "  storage_encrypted = false",
+          "  Encrypted: false"
+        ],
+        "no_match": [
+          "  storage_encrypted = true"
+        ]
+      }
+    },
+    {
+      "id": "cloud-kms-no-rotation",
+      "check_id": "CLOUD-KEY-001",
+      "title": "KMS key without automatic rotation",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)(enable_key_rotation|EnableKeyRotation|enableKeyRotation)\\s*[:=]\\s*false",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "  enable_key_rotation = false"
+        ],
+        "no_match": [
+          "  enable_key_rotation = true"
+        ]
+      }
+    },
+    {
+      "id": "cloud-http-listener",
+      "check_id": "CLOUD-TLS-001",
+      "title": "Plain HTTP listener or viewer protocol allowing HTTP",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)viewer_protocol_policy\\s*=\\s*['\\\"]allow-all['\\\"]|ViewerProtocolPolicy\\s*:\\s*allow-all|https_only\\s*=\\s*false|httpsOnly\\s*[:=]\\s*false|min_tls_version\\s*=\\s*['\\\"](TLS1_0|TLS1_1|1\\.0|1\\.1)['\\\"]|minimum_tls_version\\s*=\\s*['\\\"](1\\.0|1\\.1)['\\\"]|ssl_policy\\s*=\\s*['\\\"]ELBSecurityPolicy-(2015-05|2016-08|TLS-1-0|TLS-1-1)\\w*['\\\"]",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "  viewer_protocol_policy = \"allow-all\"",
+          "  min_tls_version = \"TLS1_0\""
+        ],
+        "no_match": [
+          "  viewer_protocol_policy = \"redirect-to-https\""
+        ]
+      }
+    },
+    {
+      "id": "cloud-trail-logging-off",
+      "check_id": "CLOUD-LOG-001",
+      "title": "Audit/access logging explicitly disabled",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)(enable_logging|is_multi_region_trail|include_global_service_events|enable_log_file_validation|EnableLogFileValidation|IsLogging|logging_enabled|access_logs_enabled)\\s*[:=]\\s*false",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "  enable_log_file_validation = false"
+        ],
+        "no_match": [
+          "  enable_log_file_validation = true"
+        ]
+      }
+    },
+    {
+      "id": "cloud-literal-password",
+      "check_id": "CLOUD-SECRET-001",
+      "title": "Literal password/secret in IaC",
+      "files": [
+        "tf",
+        "config",
+        ".bicep"
+      ],
+      "pattern": "(?i)\\b(password|master_password|admin_password|administrator_login_password|MasterUserPassword|secret|secret_key|api_key|access_key|token|client_secret)\\w*\\s*[:=]\\s*['\\\"](?!{{PLACEHOLDER}})[^'\\\"\\s$]{8,}['\\\"]",
+      "file_requires": "(?i)resource\\s+\\\"|AWSTemplateFormatVersion|AWS::|param\\s+\\w+|Microsoft\\.\\w+/|provider\\s+\\\"",
+      "redact": true,
+      "confidence": "HIGH",
+      "note": "Secrets in IaC end up in state files and plans too. Use a secret manager data source or ephemeral values; rotate this one.",
+      "examples": {
+        "match": [
+          "resource \"aws_db_instance\" \"db\" {\n  password = \"q8Zr3LmN0vXw2Kp\"\n}"
+        ],
+        "no_match": [
+          "resource \"aws_db_instance\" \"db\" {\n  password = var.db_password\n}",
+          "resource \"aws_db_instance\" \"db\" {\n  manage_master_user_password = true\n}"
+        ]
+      }
+    },
+    {
+      "id": "cloud-secret-variable-default",
+      "check_id": "CLOUD-SECRET-001",
+      "title": "Secret-looking Terraform variable with a default value",
+      "files": [
+        "tf"
+      ],
+      "multiline": true,
+      "pattern": "variable\\s+\\\"[^\\\"]*(password|secret|token|api_key|access_key|private_key)[^\\\"]*\\\"\\s*\\{[^}]*default\\s*=\\s*\\\"(?!\\\")[^\\\"]{6,}\\\"",
+      "redact": true,
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "variable \"db_password\" {\n  type    = string\n  default = \"q8Zr3LmN0vXw\"\n}"
+        ],
+        "no_match": [
+          "variable \"db_password\" {\n  type      = string\n  sensitive = true\n}"
+        ]
+      }
+    },
+    {
+      "id": "cloud-imdsv1",
+      "check_id": "CLOUD-META-001",
+      "title": "Instance metadata allows IMDSv1",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)http_tokens\\s*=\\s*['\\\"]optional['\\\"]|HttpTokens\\s*:\\s*optional|httpTokens\\s*:\\s*['\\\"]optional['\\\"]|requireImdsv2\\s*:\\s*false",
+      "confidence": "HIGH",
+      "note": "IMDSv1 lets any SSRF read instance credentials. Set http_tokens = \"required\" and a hop limit of 1.",
+      "examples": {
+        "match": [
+          "metadata_options {\n  http_tokens = \"optional\"\n}"
+        ],
+        "no_match": [
+          "metadata_options {\n  http_tokens = \"required\"\n}"
+        ]
+      }
+    },
+    {
+      "id": "cloud-api-no-auth",
+      "check_id": "CLOUD-FN-001",
+      "title": "API gateway method or function URL without authentication",
+      "files": [
+        "tf",
+        "config",
+        "code",
+        ".bicep"
+      ],
+      "pattern": "(?i)\\bauthorization\\s*[:=]\\s*['\\\"]NONE['\\\"]|AuthorizationType\\s*:\\s*NONE|authorization_type\\s*=\\s*['\\\"]NONE['\\\"]|authType\\s*[:=]\\s*['\\\"]?NONE|FunctionUrlAuthType\\.NONE|AuthType\\s*:\\s*NONE|allow_unauthenticated|['\\\"]allUsers['\\\"][^\\n]*run\\.invoker|run\\.invoker[^\\n]*['\\\"]allUsers['\\\"]",
+      "confidence": "MEDIUM",
+      "note": "Fine for intentionally public endpoints; confirm the function does its own authentication otherwise.",
+      "examples": {
+        "match": [
+          "resource \"aws_api_gateway_method\" \"m\" {\n  http_method   = \"POST\"\n  authorization = \"NONE\"\n}",
+          "  AuthType: NONE"
+        ],
+        "no_match": [
+          "  authorization = \"COGNITO_USER_POOLS\""
+        ]
+      }
+    },
+    {
+      "id": "cloud-state-committed",
+      "check_id": "CLOUD-STATE-001",
+      "title": "Terraform state file present in the repository",
+      "files": [
+        "any"
+      ],
+      "path_includes": "(?i)\\.tfstate(\\.backup)?$",
+      "pattern": "\\\"terraform_version\\\"|\\\"serial\\\"\\s*:",
+      "confidence": "HIGH",
+      "note": "State files contain every secret Terraform knows. Delete from history, rotate the secrets, use an encrypted remote backend.",
+      "examples": {
+        "match": [
+          "{\n  \"version\": 4,\n  \"terraform_version\": \"1.8.0\",\n  \"serial\": 3\n}"
+        ],
+        "no_match": [
+          "{ \"name\": \"x\" }"
+        ]
+      }
+    },
+    {
+      "id": "cloud-backend-unencrypted",
+      "check_id": "CLOUD-STATE-001",
+      "title": "Remote state backend without encryption",
+      "files": [
+        "tf"
+      ],
+      "pattern": "(?i)^\\s*encrypt\\s*=\\s*false",
+      "near": {
+        "pattern": "backend\\s+\\\"s3\\\"",
+        "lines": 10
+      },
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "terraform {\n  backend \"s3\" {\n    bucket = \"tf\"\n    encrypt = false\n  }\n}"
+        ],
+        "no_match": [
+          "terraform {\n  backend \"s3\" {\n    bucket = \"tf\"\n    encrypt = true\n  }\n}"
+        ]
+      }
+    },
+    {
+      "id": "cloud-module-unpinned",
+      "check_id": "CLOUD-PIN-001",
+      "title": "Terraform module from git/registry without a pinned version",
+      "files": [
+        "tf"
+      ],
+      "pattern": "^\\s*source\\s*=\\s*\\\"(git::|github\\.com/|git@|https://)[^\\\"?]*\\\"",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "module \"vpc\" {\n  source = \"git::https://github.com/acme/tf-vpc.git\"\n}"
+        ],
+        "no_match": [
+          "module \"vpc\" {\n  source = \"git::https://github.com/acme/tf-vpc.git?ref=v1.4.0\"\n}"
+        ]
+      }
+    }
+  ]
+}
