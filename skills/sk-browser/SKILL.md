@@ -1,12 +1,14 @@
 ---
 name: sk-browser
-description: Audits browser-side protections of a web application in any stack, covering security headers (HSTS, nosniff, Referrer-Policy, Permissions-Policy, COOP), clickjacking (frame-ancestors, X-Frame-Options), session and auth cookie attributes (Secure, HttpOnly, SameSite, __Host- prefix, cookies set from JavaScript), tokens in localStorage/sessionStorage, secrets in client bundles and public env variables (NEXT_PUBLIC_, VITE_, REACT_APP_), third-party scripts and tag managers, Subresource Integrity, mixed content and target=_blank tabnabbing. Based on the OWASP HTTP Headers, Clickjacking, Third Party JavaScript and HTML5 Security cheat sheets. Writes security-report-browser.md. Use when the user asks about security headers, cookies, clickjacking, localStorage tokens, front-end secrets, third-party scripts, or types /sk-browser.
+description: Audits browser-side protections, covering security headers, clickjacking, cookie attributes, tokens in localStorage, secrets in client bundles, third-party scripts and SRI. Use when the user asks about security headers, cookies, clickjacking, front-end secrets or third-party scripts, or types /sk-browser.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-browser: browser-side security audit
+
+**Scope.** Audits browser-side protections of a web application in any stack, covering security headers (HSTS, nosniff, Referrer-Policy, Permissions-Policy, COOP), clickjacking (frame-ancestors, X-Frame-Options), session and auth cookie attributes (Secure, HttpOnly, SameSite, __Host- prefix, cookies set from JavaScript), tokens in localStorage/sessionStorage, secrets in client bundles and public env variables (NEXT_PUBLIC_, VITE_, REACT_APP_), third-party scripts and tag managers, Subresource Integrity, mixed content and target=_blank tabnabbing. Based on the OWASP HTTP Headers, Clickjacking, Third Party JavaScript and HTML5 Security cheat sheets. Writes security-report-browser.md.
 
 Browsers enforce strong protections, but only when the server asks for them and the front end doesn't undo them.
 This skill checks the headers and cookie attributes the app sends, and what the client code exposes: tokens in

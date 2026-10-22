@@ -1,12 +1,14 @@
 ---
 name: sk-cicd
-description: Audits CI/CD pipelines on any platform (GitHub Actions, GitLab CI, Jenkins, CircleCI, Azure Pipelines, Bitbucket and others), covering untrusted code in privileged triggers (pull_request_target, workflow_run), script injection from PR/issue text, token permissions, long-lived cloud keys vs OIDC, unpinned actions and images, lockfile enforcement, secrets in pipeline files and logs, self-hosted runners, privileged steps, curl-pipe-shell, cache/artifact poisoning, deployment approval gates, branch protection, security scanning and AI agents in CI. Based on the OWASP CI/CD and GitHub Actions cheat sheets. Writes security-report-cicd.md. Use when the user asks to audit build pipelines, workflows or supply-chain security, or types /sk-cicd.
+description: Audits CI/CD pipelines (GitHub Actions, GitLab CI, Jenkins and others) for untrusted code in privileged triggers, script injection, token permissions, unpinned actions, secrets in logs and runners. Use when the user asks about pipeline, workflow or supply-chain security, or types /sk-cicd.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-cicd: CI/CD pipeline audit
+
+**Scope.** Audits CI/CD pipelines on any platform (GitHub Actions, GitLab CI, Jenkins, CircleCI, Azure Pipelines, Bitbucket and others), covering untrusted code in privileged triggers (pull_request_target, workflow_run), script injection from PR/issue text, token permissions, long-lived cloud keys vs OIDC, unpinned actions and images, lockfile enforcement, secrets in pipeline files and logs, self-hosted runners, privileged steps, curl-pipe-shell, cache/artifact poisoning, deployment approval gates, branch protection, security scanning and AI agents in CI. Based on the OWASP CI/CD and GitHub Actions cheat sheets. Writes security-report-cicd.md.
 
 A pipeline holds the keys to production. Every CI system has the same parts: **triggers** (who can start a
 run), **code** (what runs), **identity** (what the run can reach), **dependencies** (what it pulls in),

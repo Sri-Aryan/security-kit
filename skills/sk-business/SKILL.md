@@ -1,12 +1,14 @@
 ---
 name: sk-business
-description: Audits business logic for abuse in any domain or stack, covering client-controlled prices, totals and discounts, negative or extreme quantities, coupon/gift-card/referral/trial reuse, skipped or reordered workflow steps, trust in hidden fields, cookies or front-end checks, per-user limits and multi-account abuse, self-approval and separation of duties, floating-point money, refunds exceeding the original, race-prone scarce resources and guessable value codes. Based on the OWASP Abuse Case and Transaction Authorization cheat sheets and OWASP API6. Writes security-report-business.md. Use when the user asks about business logic flaws, price tampering, coupon abuse, checkout or workflow security, fraud, or types /sk-business.
+description: Audits business logic abuse, covering client-controlled prices, negative quantities, coupon and trial reuse, skipped workflow steps, self-approval and refund bounds. Use when the user asks about logic flaws, price tampering, coupon abuse, checkout or workflow security, or types /sk-business.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-business: business logic audit
+
+**Scope.** Audits business logic for abuse in any domain or stack, covering client-controlled prices, totals and discounts, negative or extreme quantities, coupon/gift-card/referral/trial reuse, skipped or reordered workflow steps, trust in hidden fields, cookies or front-end checks, per-user limits and multi-account abuse, self-approval and separation of duties, floating-point money, refunds exceeding the original, race-prone scarce resources and guessable value codes. Based on the OWASP Abuse Case and Transaction Authorization cheat sheets and OWASP API6. Writes security-report-business.md.
 
 Business logic flaws are valid requests that break what the business assumes: paying less, redeeming twice,
 skipping a step, approving your own request. Scanners rarely find them because nothing is malformed. The method is:

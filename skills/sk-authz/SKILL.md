@@ -1,12 +1,14 @@
 ---
 name: sk-authz
-description: Audits the access-control design of an application in any language and framework, covering the permission model (RBAC, ABAC, relationships), central enforcement vs scattered checks, default-deny and public exceptions, object-level checks and query scoping (IDOR), multi-tenant isolation and row-level security, admin/role checks, roles or tenant IDs taken from client input, self-escalation through update endpoints, field-level filtering, files and exports in public folders, stale permissions in long-lived tokens, and authorization test matrices. Based on the OWASP Authorization, Multi-Tenant Security and IDOR cheat sheets. Writes security-report-authz.md. Use when the user asks about access control, permissions, roles, multi-tenancy, privilege escalation, or types /sk-authz.
+description: Audits access control, covering the permission model, central enforcement, default deny, object-level checks (IDOR), multi-tenant isolation, role escalation and field-level filtering. Use when the user asks about access control, permissions, roles, multi-tenancy or privilege escalation, or types /sk-authz.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-authz: access-control design audit
+
+**Scope.** Audits the access-control design of an application in any language and framework, covering the permission model (RBAC, ABAC, relationships), central enforcement vs scattered checks, default-deny and public exceptions, object-level checks and query scoping (IDOR), multi-tenant isolation and row-level security, admin/role checks, roles or tenant IDs taken from client input, self-escalation through update endpoints, field-level filtering, files and exports in public folders, stale permissions in long-lived tokens, and authorization test matrices. Based on the OWASP Authorization, Multi-Tenant Security and IDOR cheat sheets. Writes security-report-authz.md.
 
 Broken access control is the top web risk because authorization is usually sprinkled, not designed. This skill
 reconstructs the **permission model** from the code, finds **where it is enforced**, and checks what happens when

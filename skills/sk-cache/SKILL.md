@@ -1,12 +1,14 @@
 ---
 name: sk-cache
-description: Audits caching for security issues across CDNs and proxies (Cloudflare, CloudFront, Fastly, Varnish, nginx), framework page and data caches (Next.js revalidate/force-static/unstable_cache, Django cache_page, Rails, Spring @Cacheable, ASP.NET OutputCache) and application caches (Redis, Memcached, in-memory), covering public caching of user-specific responses, web cache poisoning through unkeyed headers (X-Forwarded-Host, X-Original-URL), web cache deception through extension-based cache rules, per-user data cached under shared keys, missing no-store on sensitive pages, unprotected purge endpoints and cached error responses. Writes security-report-cache.md. Use when the user asks about caching, CDN configuration, cache poisoning or deception, or types /sk-cache.
+description: Audits CDN, framework and application caches for user data cached publicly, cache poisoning through unkeyed headers, cache deception and shared cache keys. Use when the user asks about caching, CDN configuration, cache poisoning or deception, or types /sk-cache.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-cache: caching security audit
+
+**Scope.** Audits caching for security issues across CDNs and proxies (Cloudflare, CloudFront, Fastly, Varnish, nginx), framework page and data caches (Next.js revalidate/force-static/unstable_cache, Django cache_page, Rails, Spring @Cacheable, ASP.NET OutputCache) and application caches (Redis, Memcached, in-memory), covering public caching of user-specific responses, web cache poisoning through unkeyed headers (X-Forwarded-Host, X-Original-URL), web cache deception through extension-based cache rules, per-user data cached under shared keys, missing no-store on sensitive pages, unprotected purge endpoints and cached error responses. Writes security-report-cache.md.
 
 A cache decides which requests are "the same". Security bugs appear when it serves one user's response to another,
 when an attacker's request poisons the stored page for everyone, or when a private page is stored at all. This skill
