@@ -1,6 +1,7 @@
 ---
 name: sk-inject
 description: Finds injection of every kind, including SQL, NoSQL, OS command, eval, template (SSTI), LDAP, XPath, XXE, header/CRLF, log forging and path traversal. Use when the user asks to find injection bugs, SQLi, command injection or SSTI, or types /sk-inject.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

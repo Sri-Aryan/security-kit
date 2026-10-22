@@ -1,6 +1,7 @@
 ---
 name: sk-logging
 description: Audits security logging and monitoring, covering missing security events, audit trails, secrets and personal data in logs, log injection, swallowed errors, retention and alerting. Use when the user asks about logging, audit trails, monitoring or sensitive data in logs, or types /sk-logging.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

@@ -1,6 +1,7 @@
 ---
 name: sk-mobile
 description: Audits Android and iOS apps (native, React Native, Expo, Flutter, Capacitor, MAUI) against OWASP MASVS, covering insecure storage, shipped secrets, cleartext traffic, exported components, deep links and WebViews. Use when the project has a mobile app, or types /sk-mobile.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
