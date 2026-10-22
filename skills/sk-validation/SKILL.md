@@ -1,12 +1,14 @@
 ---
 name: sk-validation
-description: Audits input validation at an application's entry points in any language, covering whether every endpoint and message handler validates input with a schema (zod, joi, pydantic, Bean Validation, FluentValidation, validator structs, strong parameters), server-side vs client-only checks, schemas that allow unknown fields or whose validated result is discarded, mass assignment (create/update from the whole request, guarded = [], permit!), loose comparisons and array/object type confusion, unchecked numbers (NaN, negatives, ranges), weak email/URL checks, missing Unicode/case normalization of identifiers, and deny-list filtering. Based on the OWASP Input Validation and Mass Assignment cheat sheets. Writes security-report-validation.md. Use when the user asks about input validation, mass assignment, schema validation, type juggling, or types /sk-validation.
+description: Audits input validation at entry points, covering schema validation on every endpoint, client-only checks, unknown fields and mass assignment, type confusion and number ranges. Use when the user asks about input validation, mass assignment or schema validation, or types /sk-validation.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-validation: input validation audit
+
+**Scope.** Audits input validation at an application's entry points in any language, covering whether every endpoint and message handler validates input with a schema (zod, joi, pydantic, Bean Validation, FluentValidation, validator structs, strong parameters), server-side vs client-only checks, schemas that allow unknown fields or whose validated result is discarded, mass assignment (create/update from the whole request, guarded = [], permit!), loose comparisons and array/object type confusion, unchecked numbers (NaN, negatives, ranges), weak email/URL checks, missing Unicode/case normalization of identifiers, and deny-list filtering. Based on the OWASP Input Validation and Mass Assignment cheat sheets. Writes security-report-validation.md.
 
 Validation decides what may enter the system: right types, sizes, ranges and fields, and nothing else. Done at the
 boundary with a schema, it removes mass assignment, type confusion and absurd values in one place. This skill maps

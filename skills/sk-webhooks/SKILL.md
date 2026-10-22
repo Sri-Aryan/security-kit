@@ -1,12 +1,14 @@
 ---
 name: sk-webhooks
-description: Audits webhook security in any language or framework, both receiving (signature verification over the raw body, constant-time comparison, replay windows, idempotency, fail-closed handling) and sending (SSRF on user-supplied URLs, redirects, signing, timeouts, tenant data). Writes security-report-webhooks.md with evidence and fixes. Use when the project receives webhooks from a provider (payments, Git hosting, messaging) or lets users register webhook/callback URLs, when the user asks to audit webhooks, callbacks or unsafe API consumption (OWASP API10), or types /sk-webhooks.
+description: Audits webhooks received (signature over the raw body, replay, idempotency) and sent (SSRF on user URLs, signing, timeouts). Use when the project receives provider webhooks or lets users register callback URLs, or types /sk-webhooks.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-webhooks: webhook security audit
+
+**Scope.** Audits webhook security in any language or framework, both receiving (signature verification over the raw body, constant-time comparison, replay windows, idempotency, fail-closed handling) and sending (SSRF on user-supplied URLs, redirects, signing, timeouts, tenant data). Writes security-report-webhooks.md with evidence and fixes.
 
 A webhook is an HTTP request that does **not** come from your users, so none of your normal
 authentication applies. Two concepts cover every stack and provider:

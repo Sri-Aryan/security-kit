@@ -1,12 +1,14 @@
 ---
 name: sk-tests
-description: Finds security test gaps in any language and test framework, showing which endpoints have no test proving unauthenticated requests are refused, no cross-user/cross-tenant (IDOR) test, no role test, no invalid-input or mass-assignment test, no injection payload test, no session/reset failure-path test, no rate-limit test, missing regression tests for fixed findings, fixtures that cannot express two users or that mock auth away, and whether CI runs them. Then generates the missing tests in the project's own framework and style. Based on the OWASP Web Security Testing Guide and Authorization Testing Automation cheat sheet. Writes security-report-tests.md. Use when the user asks which security paths are untested, to add auth/authorization/validation tests, or types /sk-tests.
+description: Finds missing security tests (unauthenticated access, cross-user IDOR, roles, invalid input, rate limits, regressions) and generates them in the project's own test framework. Use when the user asks which security paths are untested or to add security tests, or types /sk-tests.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-tests: security test gaps
+
+**Scope.** Finds security test gaps in any language and test framework, showing which endpoints have no test proving unauthenticated requests are refused, no cross-user/cross-tenant (IDOR) test, no role test, no invalid-input or mass-assignment test, no injection payload test, no session/reset failure-path test, no rate-limit test, missing regression tests for fixed findings, fixtures that cannot express two users or that mock auth away, and whether CI runs them. Then generates the missing tests in the project's own framework and style. Based on the OWASP Web Security Testing Guide and Authorization Testing Automation cheat sheet. Writes security-report-tests.md.
 
 A security control without a negative test is one refactor away from disappearing. This skill maps every endpoint to
 the tests that exercise it and checks for the minimum security set: **unauthenticated → 401, other user's object →

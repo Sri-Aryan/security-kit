@@ -1,12 +1,14 @@
 ---
 name: sk-upload
-description: Audits file uploads in any stack and storage (local disk, S3, GCS, Azure, CDNs), covering type validation by content vs client Content-Type, server-generated names vs path traversal and overwrite, size and decompression-bomb limits, storage in the web root, inline serving of HTML/SVG on the app origin, public ACLs and long-lived signed URLs, unconstrained presigned uploads, risky processors (ImageMagick, Ghostscript, LibreOffice, ffmpeg), zip slip, XXE in SVG/Office files, malware scanning and upload endpoint authentication. Based on the OWASP File Upload cheat sheet. Writes security-report-upload.md. Use when the project accepts files (avatars, attachments, imports, documents) and the user asks to audit uploads, or types /sk-upload.
+description: Audits file uploads, covering content-type validation, generated file names and path traversal, size limits, inline HTML/SVG serving, public storage ACLs, presigned uploads, zip slip and risky processors. Use when the project accepts files, or types /sk-upload.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-upload: file upload audit
+
+**Scope.** Audits file uploads in any stack and storage (local disk, S3, GCS, Azure, CDNs), covering type validation by content vs client Content-Type, server-generated names vs path traversal and overwrite, size and decompression-bomb limits, storage in the web root, inline serving of HTML/SVG on the app origin, public ACLs and long-lived signed URLs, unconstrained presigned uploads, risky processors (ImageMagick, Ghostscript, LibreOffice, ffmpeg), zip slip, XXE in SVG/Office files, malware scanning and upload endpoint authentication. Based on the OWASP File Upload cheat sheet. Writes security-report-upload.md.
 
 Every upload goes through four stages, and each has its own failure modes. **Accept**: who may upload what, how big.
 **Store**: where, under what name, with what permissions. **Process**: parsers, converters, archives. **Serve**: to

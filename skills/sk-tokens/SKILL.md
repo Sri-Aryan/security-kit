@@ -1,12 +1,14 @@
 ---
 name: sk-tokens
-description: Audits tokens and bearer credentials in any language or framework, including JWT verification (decode-only, alg none, algorithm confusion, weak or hardcoded keys, missing expiry/audience, kid/jku injection), token randomness, constant-time comparison, storage in localStorage/URLs/logs/database, refresh-token rotation and API key handling. Writes security-report-tokens.md with evidence and fixes. Use when the project issues or accepts JWTs, API keys, refresh tokens or session tokens and the user asks to audit token or JWT security, or types /sk-tokens.
+description: Audits tokens and API keys, covering JWT verification (alg none, algorithm confusion, weak keys, missing expiry or audience), token randomness, storage, refresh rotation and comparison. Use when the project issues or accepts JWTs, API keys or session tokens, or types /sk-tokens.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-tokens: token audit
+
+**Scope.** Audits tokens and bearer credentials in any language or framework, including JWT verification (decode-only, alg none, algorithm confusion, weak or hardcoded keys, missing expiry/audience, kid/jku injection), token randomness, constant-time comparison, storage in localStorage/URLs/logs/database, refresh-token rotation and API key handling. Writes security-report-tokens.md with evidence and fixes.
 
 Whoever holds a bearer token *is* the user. Three concepts decide a token's safety in every stack:
 **can it be forged** (signature, algorithm, key, randomness), **how long does it work and can it be stopped**
