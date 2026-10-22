@@ -1,6 +1,7 @@
 ---
 name: sk-deps
 description: Audits third-party dependencies in any ecosystem for known vulnerabilities (using local scanners), missing lockfiles, unpinned versions, typosquats, dependency confusion and install scripts. Use when the user asks about vulnerable packages, npm or pip audit, or supply-chain security, or types /sk-deps.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

@@ -1,6 +1,7 @@
 ---
 name: sk-defaults
 description: Finds insecure defaults and fail-open code, like checks skipped when config is missing, secret fallbacks, catch blocks that allow, debug by default, default-allow branches and default admin passwords. Use when the user asks about fail-open, fail-secure or insecure defaults, or types /sk-defaults.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

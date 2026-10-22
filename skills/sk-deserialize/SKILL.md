@@ -1,6 +1,7 @@
 ---
 name: sk-deserialize
 description: Finds unsafe deserialization and prototype pollution, covering pickle, Java and .NET serializers, unsafe YAML loaders, polymorphic JSON, pickle-based model loading and deep merges. Use when the user asks about deserialization, pickle, YAML load or prototype pollution, or types /sk-deserialize.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
