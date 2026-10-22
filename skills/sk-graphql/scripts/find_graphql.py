@@ -21,6 +21,8 @@ import os
 import re
 import sys
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 
 SKIP_DIRS = {
@@ -429,7 +431,7 @@ def main(argv=None):
     result = scan(args.root, args.include_tests)
     text = json.dumps(result, indent=2)
     if args.out:
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"{len(result['candidates'])} candidates -> {args.out}", file=sys.stderr)
