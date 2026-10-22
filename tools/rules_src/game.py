@@ -1,0 +1,171 @@
+"""sk-game rules: client trust in games (Unity, Godot, Unreal, Roblox, web games) and their backends
+(PlayFab, Nakama, Colyseus, Photon, Unity Gaming Services, Firebase/Supabase used as a game backend)."""
+
+SKILL = "sk-game"
+
+# Engines' script files beyond the shared "code" group.
+GAME_FILES = ["code", ".gd", ".lua", ".luau", ".cpp", ".h", ".hpp"]
+
+MACROS = {
+    "CLIENT_MSG": r"req\.body|body|data|message|msg|payload|args|params|packet|input",
+    "VALUE": r"score|high_?score|points|coins|gold|gems|currency|cash|money|xp|exp|reward|amount|kills|level|price|cost",
+}
+
+RULES = [
+    # ------------------------------------------------------------------ SERVER AUTHORITY
+    {
+        "id": "game-roblox-remote-trusts-value", "check_id": "GAME-AUTH-001", "title": "Roblox RemoteEvent handler trusts a value sent by the client", "files": [".lua", ".luau"],
+        "pattern": r"OnServer(Event|Invoke)\s*[:.]\s*Connect\(\s*function\s*\(\s*\w+\s*,\s*\w*({{VALUE}}|damage|health|speed|position|cframe|walkspeed)\w*",
+        "confidence": "HIGH", "note": "Exploiters fire RemoteEvents with any arguments. The server decides how much is earned or dealt, from its own state.",
+        "examples": {"match": ["AddCoins.OnServerEvent:Connect(function(player, amount)\n  player.leaderstats.Coins.Value += amount\nend)"],
+                     "no_match": ["CollectCoin.OnServerEvent:Connect(function(player, coinId)\n  if not coins[coinId] then return end\nend)"]},
+    },
+    {
+        "id": "game-state-set-from-message", "check_id": "GAME-AUTH-001", "title": "Authoritative state assigned straight from a client message", "files": GAME_FILES,
+        "pattern": r"\b(state|player|entity|ply|p|self)\.[\w.]*\b(score|hp|health|coins|gold|gems|xp|x|y|z|position|pos|speed|ammo|level)\s*=\s*({{CLIENT_MSG}})\.\w+",
+        "near": {"pattern": r"(?i)onMessage|on_message|OnServerEvent|socket\.on|\.on\(\s*['\"]|@rpc|ServerRpc|\[Command|RegisterMatchHandler|matchLoop|MatchLoop|handle\w*Message", "lines": 12},
+        "confidence": "HIGH", "note": "Accept inputs (move left, fire) and simulate on the server; never accept results (new position, new score).",
+        "examples": {"match": ["this.onMessage('move', (client, message) => {\n  const player = this.state.players.get(client.sessionId);\n  player.x = message.x;\n});"],
+                     "no_match": ["this.onMessage('move', (client, message) => {\n  const player = this.state.players.get(client.sessionId);\n  player.x += clamp(message.dx, -1, 1) * SPEED;\n});"]},
+    },
+    {
+        "id": "game-server-takes-client-value", "check_id": "GAME-AUTH-001", "title": "Server endpoint takes a score/currency amount from the client", "files": GAME_FILES,
+        "pattern": r"(?i)\b({{VALUE}})\w*\s*[:=]\s*(req\.body|request\.(json|body|data|form)|body|data|payload|message|msg|args)\s*(\.|\[['\"])({{VALUE}})\b",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["const coins = req.body.coins;\nawait db.player.update({ where: { id }, data: { coins: { increment: coins } } });"],
+                     "no_match": ["const levelId = req.body.levelId;\nconst coins = REWARDS[levelId];"]},
+    },
+    {
+        "id": "game-unity-owner-writes-netvar", "check_id": "GAME-AUTH-001", "title": "Client-owned write permission on a NetworkVariable", "files": [".cs"],
+        "pattern": r"NetworkVariableWritePermission\.Owner", "confidence": "MEDIUM",
+        "note": "The owning client can set this value to anything; fine for cosmetic state, not for health, score, currency or position used for hits.",
+        "examples": {"match": ["public NetworkVariable<int> Health = new(100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);"],
+                     "no_match": ["public NetworkVariable<int> Health = new(100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);"]},
+    },
+    # ------------------------------------------------------------------ SCORES / LEADERBOARDS
+    {
+        "id": "game-client-writes-leaderboard", "check_id": "GAME-SCORE-001", "title": "Client writes its own score to the leaderboard", "files": GAME_FILES,
+        "pattern": r"AddPlayerScoreAsync\(|UploadLeaderboardScore\(|\bReportScore\(|submitScore\(|GKLeaderboard\.submitScore|from\(\s*['\"](leaderboard|leaderboards|scores|highscores|high_scores)['\"]\s*\)\s*\.(insert|upsert|update)|collection\(\s*\w*,?\s*['\"](leaderboard|leaderboards|scores|highscores)['\"]\s*\)[^\n]*\.(add|set|update)|setDoc\([^)\n]*(leaderboard|scores|highscores)|addDoc\([^)\n]*(leaderboard|scores|highscores)",
+        "confidence": "MEDIUM", "note": "Anyone can call this with any number. Submit the run (inputs, seed, duration, events) to server code that validates or recomputes the score.",
+        "examples": {"match": ["await LeaderboardsService.Instance.AddPlayerScoreAsync(LeaderboardId, score);", "await supabase.from('scores').insert({ user_id, score });"],
+                     "no_match": ["await CloudCodeService.Instance.CallEndpointAsync(\"SubmitRun\", runData);"]},
+    },
+    {
+        "id": "game-client-reported-time", "check_id": "GAME-SCORE-001", "title": "Run duration or timestamp taken from the client", "files": GAME_FILES,
+        "pattern": r"(?i)\b(client_?time|clientTime|time_?taken|timeTaken|elapsed|duration|completion_?time|completionTime|finish_?time|finishTime|started_?at|startedAt)\s*[:=]\s*({{CLIENT_MSG}})(\.|\[['\"])\w+",
+        "confidence": "MEDIUM", "note": "Speedrun times and anti-spam windows must use server timestamps (session start on the server).",
+        "examples": {"match": ["const timeTaken = req.body.timeTaken;"], "no_match": ["const timeTaken = Date.now() - session.startedAt;"]},
+    },
+    {
+        "id": "game-playfab-client-statistics", "check_id": "GAME-BACKEND-001", "title": "Client API updates player statistics / virtual currency", "files": GAME_FILES,
+        "pattern": r"PlayFabClientAPI\.(UpdatePlayerStatistics|AddUserVirtualCurrency|SubtractUserVirtualCurrency|UpdateUserData|UpdateUserReadOnlyData)|Client/(UpdatePlayerStatistics|AddUserVirtualCurrency)",
+        "confidence": "HIGH", "note": "Turn off 'Allow client to post player statistics' / 'Allow client to add virtual currency' in Title settings and move these calls to CloudScript / Azure Functions.",
+        "examples": {"match": ["PlayFabClientAPI.UpdatePlayerStatistics(new UpdatePlayerStatisticsRequest { Statistics = stats }, OnOk, OnErr);"],
+                     "no_match": ["PlayFabCloudScriptAPI.ExecuteFunction(new ExecuteFunctionRequest { FunctionName = \"SubmitScore\" }, OnOk, OnErr);"]},
+    },
+    # ------------------------------------------------------------------ ECONOMY
+    {
+        "id": "game-wallet-update-from-payload", "check_id": "GAME-ECON-001", "title": "Wallet/currency changed by an amount from the client", "files": GAME_FILES,
+        "pattern": r"(walletUpdate|wallet_update|WalletUpdate|walletsUpdate|AddUserVirtualCurrency|addCurrency|add_currency|grantCurrency|GrantItems\w*)\([^)\n]*({{CLIENT_MSG}})(\.|\[['\"])\w*(amount|coins|gold|gems|value|items|changeset)",
+        "confidence": "HIGH",
+        "examples": {"match": ["nk.walletUpdate(ctx.userId, { coins: data.amount }, {}, true);"], "no_match": ["nk.walletUpdate(ctx.userId, { coins: QUEST_REWARDS[questId] }, {}, true);"]},
+    },
+    {
+        "id": "game-price-from-client", "check_id": "GAME-ECON-001", "title": "Item price taken from the client", "files": GAME_FILES,
+        "pattern": r"(?i)\b(price|cost|item_?price|itemPrice)\s*[:=]\s*({{CLIENT_MSG}})(\.|\[['\"])(price|cost|itemPrice|item_price)\b", "confidence": "HIGH",
+        "examples": {"match": ["local price = data.price"], "no_match": ["local price = SHOP_ITEMS[data.itemId].price"]},
+    },
+    {
+        "id": "game-local-currency-prefs", "check_id": "GAME-SAVE-001", "title": "Currency/progress stored in local preferences", "files": [".cs", ".gd", ".js", ".ts"],
+        "pattern": r"(?i)(PlayerPrefs\.Set(Int|Float|String)|localStorage\.setItem|ConfigFile\.set_value|config\.set_value)\(\s*[^\n]*['\"](coins|gold|gems|currency|money|premium|vip|is_?pro|unlocked\w*|noads|no_ads|purchased\w*)['\"]",
+        "confidence": "LOW", "note": "Editable with a text editor or memory tools. Fine for single-player offline games; a finding when it affects purchases, leaderboards or multiplayer.",
+        "examples": {"match": ["PlayerPrefs.SetInt(\"gems\", gems);", "PlayerPrefs.SetInt(\"noads\", 1);"], "no_match": ["PlayerPrefs.SetFloat(\"musicVolume\", vol);"]},
+    },
+    # ------------------------------------------------------------------ IAP / ADS
+    {
+        "id": "game-unity-iap-no-validation", "check_id": "GAME-IAP-001", "type": "absence", "scope": "file",
+        "title": "Purchase granted on the client without receipt validation", "files": [".cs", ".gd", ".js", ".ts", ".dart"],
+        "when": r"ProcessPurchase\s*\(|OnPurchaseSucceeded|purchaseUpdatedListener|onPurchasesUpdated|purchase_updated|PurchaseUpdated|didFinishPurchase|onPurchaseSuccess",
+        "missing": r"(?i)validat|verif|receipt|CrossPlatformValidator|server|backend|cloud|api/|Transaction\.currentEntitlements|jwsRepresentation|revenuecat|Purchases\.",
+        "confidence": "MEDIUM", "note": "Fake purchase apps and hooked billing libraries call the success callback without paying. Validate on your server with the App Store Server API / Google Play Developer API and grant items there.",
+        "examples": {"match": ["public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs e) {\n  gems += 500;\n  return PurchaseProcessingResult.Complete;\n}"],
+                     "no_match": ["public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs e) {\n  StartCoroutine(ValidateOnServer(e.purchasedProduct.receipt));\n  return PurchaseProcessingResult.Pending;\n}"]},
+    },
+    {
+        "id": "game-iap-legacy-verifyreceipt", "check_id": "GAME-IAP-001", "title": "Deprecated Apple verifyReceipt endpoint", "files": GAME_FILES,
+        "pattern": r"(buy|sandbox)\.itunes\.apple\.com/verifyReceipt", "confidence": "LOW",
+        "note": "Apple deprecated verifyReceipt; use the App Store Server API and signed transactions (JWS).",
+        "examples": {"match": ["const r = await fetch('https://buy.itunes.apple.com/verifyReceipt', { method: 'POST', body });"], "no_match": ["const tx = await api.getTransactionInfo(transactionId);"]},
+    },
+    {
+        "id": "game-iap-no-replay-check", "check_id": "GAME-IAP-001", "type": "absence", "scope": "file",
+        "title": "Server receipt validation without a transaction-ID replay check", "files": GAME_FILES,
+        "when": r"(?i)verifyReceipt|purchases\.products\.get|purchases\.subscriptionsv2|getTransactionInfo|AppStoreServerAPI|androidpublisher|validatePurchase|ValidateGooglePlayPurchase|ValidateIOSReceipt",
+        "missing": r"(?i)transaction_?id|transactionId|orderId|order_id|purchaseToken|purchase_token|originalTransactionId|already|processed|idempot|unique",
+        "confidence": "LOW", "note": "A valid receipt submitted twice (or by two accounts) must not grant twice. Record processed transaction IDs with a unique constraint.",
+        "examples": {"match": ["const res = await androidpublisher.purchases.products.get({ packageName, productId, token });\nawait grantGems(userId, 500);"],
+                     "no_match": ["const res = await androidpublisher.purchases.products.get({ packageName, productId, token });\nawait db.purchase.create({ data: { orderId: res.data.orderId } });"]},
+    },
+    {
+        "id": "game-rewarded-ad-client-grant", "check_id": "GAME-ADS-001", "title": "Rewarded-ad reward granted from the client callback", "files": GAME_FILES,
+        "pattern": r"(?i)(OnUserEarnedReward|onUserEarnedReward|HandleUserEarnedReward|OnUnityAdsShowComplete|onRewarded\w*|rewardedVideoAdRewarded|onAdRewarded|OnRewardedAdReceivedReward|OnAdRewarded)",
+        "near": {"pattern": r"(?i)(coins|gems|gold|currency|reward|credits|lives|energy)\w*\s*(\+=|\+\+|=\s*\w+\s*\+)|AddCurrency|GrantReward|grant\w*\(|give\w*\(", "lines": 15},
+        "not_near": {"pattern": r"(?i)ssv|server.?side.?verif|ServerSideVerificationOptions|callback.?url|s2s|custom_?data", "lines": 30},
+        "confidence": "MEDIUM", "note": "Use the ad network's server-side verification callback (AdMob SSV, Unity Ads S2S, AppLovin S2S) to grant rewards.",
+        "examples": {"match": ["rewardedAd.Show((Reward reward) => {\n  // OnUserEarnedReward\n  coins += 50;\n});"],
+                     "no_match": ["rewardedAd.SetServerSideVerificationOptions(options);\n// OnUserEarnedReward: wait for the server to credit the reward\nRefreshWalletFromServer();"]},
+    },
+    # ------------------------------------------------------------------ NETWORKING
+    {
+        "id": "game-rpc-no-ownership", "check_id": "GAME-NET-001", "title": "Server RPC callable by any client", "files": [".cs"],
+        "pattern": r"RequireOwnership\s*=\s*false|\[Command\(\s*requiresAuthority\s*=\s*false\s*\)\]", "confidence": "MEDIUM",
+        "note": "Any connected client can invoke it for any object; check the sender (ServerRpcParams / RpcParams.Receive.SenderClientId, connectionToClient) inside.",
+        "examples": {"match": ["[ServerRpc(RequireOwnership = false)]\npublic void DamageServerRpc(ulong targetId, int amount) {}"],
+                     "no_match": ["[ServerRpc]\npublic void FireServerRpc() {}"]},
+    },
+    {
+        "id": "game-godot-any-peer-rpc", "check_id": "GAME-NET-001", "title": "Godot any_peer RPC without a sender check", "files": [".gd"],
+        "pattern": r"@rpc\(\s*[\"']any_peer[\"']", "not_near": {"pattern": r"get_remote_sender_id\(\)", "lines": 8}, "confidence": "MEDIUM",
+        "examples": {"match": ["@rpc(\"any_peer\", \"reliable\")\nfunc set_health(value):\n\thealth = value"],
+                     "no_match": ["@rpc(\"any_peer\", \"reliable\")\nfunc request_jump():\n\tvar id = multiplayer.get_remote_sender_id()"]},
+    },
+    {
+        "id": "game-unreal-server-rpc-no-validation", "check_id": "GAME-NET-001", "title": "Unreal Server RPC without WithValidation", "files": [".h", ".hpp"],
+        "pattern": r"UFUNCTION\(\s*(?![^)]*WithValidation)[^)]*\bServer\b[^)]*\)", "confidence": "LOW",
+        "note": "Optional since UE 4.25, but a _Validate function is the cheapest place to reject impossible parameters (and kick the client).",
+        "examples": {"match": ["UFUNCTION(Server, Reliable)\nvoid ServerFire(FVector Direction);"], "no_match": ["UFUNCTION(Server, Reliable, WithValidation)\nvoid ServerFire(FVector Direction);"]},
+    },
+    {
+        "id": "game-message-handler-no-rate-limit", "check_id": "GAME-RATE-001", "type": "absence", "scope": "file",
+        "title": "Multiplayer message handlers with no rate limiting", "files": GAME_FILES,
+        "when": r"onMessage\(|OnServerEvent|socket\.on\(|room\.onMessage|RegisterMatchHandler|matchLoop|MatchLoop|\[ServerRpc|\[Command|@rpc\(",
+        "missing": "{{RATE_LIMIT}}|(?i:cooldown|last_?action|lastAction|messagesPerSecond|maxMessages|tick_?rate|debounce|leaky|tokens)",
+        "confidence": "LOW",
+        "examples": {"match": ["this.onMessage('chat', (client, msg) => this.broadcast('chat', msg));"],
+                     "no_match": ["this.onMessage('chat', (client, msg) => { if (!limiter.consume(client.sessionId)) return; this.broadcast('chat', msg); });"]},
+    },
+    # ------------------------------------------------------------------ SECRETS IN CLIENT BUILDS
+    {
+        "id": "game-server-key-in-client", "check_id": "GAME-SECRET-001", "title": "Server/admin key embedded in the game client", "files": GAME_FILES + [".asset", "config"],
+        "pattern": r"(?i)\b(DeveloperSecretKey|developer_?secret_?key|X-SecretKey|server_?key|serverKey|admin_?key|adminKey|admin_?token|service_?account_?key|private_?key|privateKey|api_?secret|apiSecret)\s*[:=]\s*[\"'][^\"'\s$]{8,}[\"']",
+        "path_excludes": r"(?i)(^|/)(server|backend|cloudscript|cloud-?code|functions|nakama|services)/",
+        "not_near": {"pattern": "{{PLACEHOLDER}}", "lines": 0}, "confidence": "HIGH", "redact": True,
+        "note": "Game builds are trivially unpacked (IL2CPP dumpers, .pck/.pak extractors). Anything in the client is public.",
+        "examples": {"match": [{"b64": "UGxheUZhYlNldHRpbmdzLnN0YXRpY1NldHRpbmdzLkRldmVsb3BlclNlY3JldEtleSA9ICJLOFozUTFYN00yUDlWNEw2IjsK"}],
+                     "no_match": ["PlayFabSettings.staticSettings.TitleId = \"A1B2C\";"]},
+    },
+    {
+        "id": "game-playfab-admin-api-define", "check_id": "GAME-SECRET-001", "title": "PlayFab server/admin API compiled into the client", "files": [".asset", ".cs", ".rsp", "config"],
+        "pattern": r"ENABLE_PLAYFAB(ADMIN|SERVER)_API", "confidence": "MEDIUM",
+        "note": "These defines are only for dedicated servers and tools; in a client build they mean a secret key is expected nearby.",
+        "examples": {"match": ["scriptingDefineSymbols: ENABLE_PLAYFABSERVER_API;UNITY_POST_PROCESSING"], "no_match": ["scriptingDefineSymbols: UNITY_POST_PROCESSING"]},
+    },
+    # ------------------------------------------------------------------ DEBUG / CHEATS
+    {
+        "id": "game-cheat-flag-on", "check_id": "GAME-DEBUG-001", "title": "Cheat/debug flag enabled outside a debug-only guard", "files": GAME_FILES,
+        "pattern": r"(?i)\b(god_?mode|godMode|infinite_?(health|ammo|money|coins|lives)|unlock_?all|unlockAll|give_?all|cheats?_?(mode|enabled)|cheatsEnabled|debug_?menu|dev_?console|devConsole|skip_?paywall|all_?levels_?unlocked)\s*[:=]\s*(true|True|1)\b",
+        "not_near": {"pattern": r"#if|OS\.is_debug_build|Debug\.isDebugBuild|import\.meta\.env\.DEV|NODE_ENV|kDebugMode|__DEV__|UE_BUILD_SHIPPING|WITH_EDITOR|DEVELOPMENT_BUILD", "lines": 5},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["public static bool godMode = true;"], "no_match": ["#if DEVELOPMENT_BUILD\npublic static bool godMode = true;\n#endif"]},
+    },
+]
