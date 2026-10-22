@@ -1,0 +1,126 @@
+"""sk-abuse rules: fake sign-ups, CAPTCHA verification, free-tier and trial farming, referral abuse, client-side
+paywalls, user-generated spam and bot detection."""
+
+SKILL = "sk-abuse"
+
+MACROS = {
+    # Bare `register(` must not be a method call (DRF router.register, admin.site.register, service workers).
+    "SIGNUP": r"(?i:(?<![\w.])(signUp|sign_up|signup|register)\s*\(|\b(registerUser|register_user|createUser|create_user|createAccount|create_account)\s*\(|auth\.signUp\(|createUserWithEmailAndPassword\(|\.signUpEmail\(|['\"]/(api/)?(auth/)?(signup|sign-up|register)['\"])",
+}
+
+RULES = [
+    # ------------------------------------------------------------------ SIGN-UP
+    {
+        "id": "abuse-signup-no-bot-check", "check_id": "ABUSE-SIGNUP-001", "type": "absence", "scope": "project",
+        "title": "Sign-up with no CAPTCHA or bot check anywhere in the project", "files": ["code", "config", "web"],
+        "when": "{{SIGNUP}}",
+        "missing": r"(?i)captcha|turnstile|recaptcha|friendlycaptcha|altcha|botid|checkBotId|appCheck|App\s*Check|arcjet|proof.?of.?work|\[auth\.captcha\]|cf-turnstile",
+        "confidence": "LOW", "note": "Bot protection may live in a WAF or the auth provider's dashboard (Clerk, Supabase, Auth0 bot detection). Ask before confirming.",
+        "examples": {"match": ["const { data, error } = await supabase.auth.signUp({ email, password });"],
+                     "no_match": ["await supabase.auth.signUp({ email, password, options: { captchaToken } });"]},
+    },
+    {
+        "id": "abuse-captcha-not-verified", "check_id": "ABUSE-CAPTCHA-001", "type": "absence", "scope": "project",
+        "title": "CAPTCHA widget rendered but never verified on the server", "files": ["code", "config", "web"],
+        "when": r"(?i)cf-turnstile|<Turnstile|@marsidev/react-turnstile|grecaptcha|react-google-recaptcha|h-captcha|@hcaptcha|friendly-challenge",
+        "missing": r"(?i)siteverify|verifyToken|verify_?captcha|verifyCaptcha|verifyTurnstile|recaptcha\.verify|hcaptcha\.verify|createAssessment|\[auth\.captcha\]|captchaToken|captcha_token",
+        "confidence": "MEDIUM", "note": "A widget that is only checked in the browser stops nothing: bots call the API directly.",
+        "examples": {"match": ["<Turnstile siteKey={SITE_KEY} onSuccess={setToken} />"],
+                     "no_match": ["<Turnstile siteKey={SITE_KEY} onSuccess={setToken} />\nconst r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body });"]},
+    },
+    {
+        "id": "abuse-captcha-result-unchecked", "check_id": "ABUSE-CAPTCHA-001", "title": "CAPTCHA verification response not checked for hostname/action", "files": ["code"],
+        "pattern": r"(?i)siteverify", "not_near": {"pattern": r"(?i)hostname|\baction\b|expectedAction|idempotency_key", "lines": 15}, "confidence": "LOW",
+        "note": "Also check `hostname` (and `action` for reCAPTCHA v3 / Turnstile) so tokens solved on another site, or for another form, are rejected.",
+        "examples": {"match": ["const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: form });\nif (!(await res.json()).success) throw new Error('bot');"],
+                     "no_match": ["const out = await (await fetch(SITEVERIFY_URL, { method: 'POST', body })).json();\nif (!out.success || out.hostname !== 'app.acme.com' || out.action !== 'signup') throw new Error('bot');"]},
+    },
+    {
+        "id": "abuse-recaptcha-low-threshold", "check_id": "ABUSE-CAPTCHA-001", "title": "reCAPTCHA v3 score threshold close to zero", "files": ["code"],
+        "pattern": r"(?i)\bscore\s*(>=?|<)\s*0?\.[0-2]\d*\b", "near": {"pattern": r"(?i)recaptcha|captcha|assessment", "lines": 10}, "confidence": "LOW",
+        "examples": {"match": ["if (result.score < 0.1) return reject();  // recaptcha"], "no_match": ["if (result.score < 0.5) return reject();  // recaptcha"]},
+    },
+    # ------------------------------------------------------------------ EMAIL IDENTITY
+    {
+        "id": "abuse-no-disposable-email-check", "check_id": "ABUSE-EMAIL-001", "type": "absence", "scope": "project",
+        "title": "Free sign-up with no disposable-email or domain check", "files": ["code", "config"],
+        "when": "{{SIGNUP}}",
+        "missing": r"(?i)disposable|burner|temp[-_]?mail|mailchecker|is-disposable|disposable-email-domains|block(ed)?_?domains|allowed_?domains|email_?domain_?(allow|deny|block)|deny_?list|denylist",
+        "confidence": "LOW", "note": "Only matters when sign-up grants something of value (credits, trials, AI calls, storage).",
+        "examples": {"match": ["export async function register(email: string, password: string) { await db.user.create({ data: { email } }); }"],
+                     "no_match": ["import { isDisposable } from 'is-disposable-email';\nexport async function register(email) { if (isDisposable(email)) throw 400; }"]},
+    },
+    {
+        "id": "abuse-email-uniqueness-unnormalized", "check_id": "ABUSE-EMAIL-001", "title": "Trial/credit eligibility keyed on the raw email address", "files": ["code"],
+        "pattern": r"(?i)(findUnique|findFirst|findOne|exists|where|filter_by|filter)\([^)\n]*\bemail\s*([:=]+\s*(req\.body\.email|body\.email|input\.email|email)\b|\}|,)",
+        "not_near": {"pattern": r"(?i)normaliz|toLowerCase|lower\(|canonical|normalizeEmail|strip_plus|\+.*split", "lines": 6},
+        "file_requires": r"(?i)trial|credit|free|referr|coupon|bonus|quota",
+        "confidence": "LOW", "note": "a.b+1@gmail.com, ab+2@gmail.com and AB@gmail.com are one inbox. Normalise (lower-case, strip +tags, Gmail dots) before checking 'already used a trial'.",
+        "examples": {"match": ["// grant free credits once per email\nconst existing = await prisma.user.findUnique({ where: { email } });"],
+                     "no_match": ["// grant free credits once per email\nconst existing = await prisma.user.findUnique({ where: { email: normalizeEmail(email) } });"]},
+    },
+    # ------------------------------------------------------------------ TRIALS / CREDITS
+    {
+        "id": "abuse-credits-before-verification", "check_id": "ABUSE-TRIAL-001", "title": "Credits/quota granted at sign-up before email verification", "files": ["code"],
+        "pattern": r"(?i)\b(credits|free_?credits|tokens_?remaining|quota|balance|trial_?credits|ai_?credits|generations)\w*\s*[:=]\s*\d{2,}",
+        "near": {"pattern": "{{SIGNUP}}|(?i:on_?user_?created|user\\.created|after_?create|handle_new_user)", "lines": 15},
+        "not_near": {"pattern": r"(?i)email_?verified|emailVerified|email_confirmed|confirmed_at|isVerified|is_verified|verified", "lines": 15},
+        "confidence": "LOW",
+        "examples": {"match": ["await auth.signUp({ email, password });\nawait db.profile.create({ data: { userId, credits: 50 } });"],
+                     "no_match": ["if (!user.emailVerified) return;\nawait db.profile.update({ where: { userId }, data: { credits: 50 } });"]},
+    },
+    {
+        "id": "abuse-trial-without-history", "check_id": "ABUSE-TRIAL-001", "title": "Trial started without checking previous trials", "files": ["code"],
+        "pattern": r"(?i)\b(trial_?(ends|end|expires)_?at|trialEnd|trial_end|trial_period_days|trialPeriodDays|trial_days)\b\s*[:=]",
+        "not_near": {"pattern": r"(?i)fingerprint|had_?trial|hasHadTrial|trial_?used|used_?trial|previous|already|once|payment_?method|card|device", "lines": 12},
+        "confidence": "LOW", "note": "Delete-and-re-sign-up or new emails restart the trial. Key eligibility on something harder to rotate (card fingerprint, verified phone, device, normalised email).",
+        "examples": {"match": ["const sub = await stripe.subscriptions.create({ customer, items, trial_period_days: 14 });"],
+                     "no_match": ["if (user.hasHadTrial) throw new Error('trial used');\nconst sub = await stripe.subscriptions.create({ customer, items, trial_period_days: 14 });"]},
+    },
+    # ------------------------------------------------------------------ FREE TIER
+    {
+        "id": "abuse-paid-api-no-quota", "check_id": "ABUSE-FREE-001", "title": "Paid AI/media API called with no usage check nearby", "files": ["code"],
+        "pattern": r"chat\.completions\.create\(|messages\.create\(|responses\.create\(|\bgenerateText\(|\bstreamText\(|\bgenerateObject\(|generate_content\(|images\.generate\(|audio\.(speech|transcriptions)\.create\(|replicate\.run\(|fal\.(run|subscribe)\(",
+        "not_near": {"pattern": r"(?i)quota|credits?|usage|limit|ratelimit|rate_limit|plan|tier|subscription|remaining|allowance|budget", "lines": 25},
+        "path_excludes": r"(?i)(scripts?|seed|eval|bench)/", "confidence": "LOW",
+        "note": "Free accounts (and anonymous visitors) can run up your bill. Enforce a per-user and per-IP quota on the server before calling the provider.",
+        "examples": {"match": ["export async function POST(req) {\n  const { prompt } = await req.json();\n  const r = await openai.chat.completions.create({ model, messages: [{ role: 'user', content: prompt }] });\n}"],
+                     "no_match": ["const { success } = await ratelimit.limit(userId);\nif (!success) return tooMany();\nconst r = await openai.chat.completions.create({ model, messages });"]},
+    },
+    {
+        "id": "abuse-anonymous-sign-in", "check_id": "ABUSE-FREE-001", "title": "Anonymous sign-in enabled", "files": ["code", ".toml"],
+        "pattern": r"(?i)signInAnonymously\(|enable_anonymous_sign_ins\s*=\s*true|anonymous\(\)\s*[,\]]", "confidence": "LOW",
+        "note": "Each anonymous session is a new free user. Cap them per IP/device, add CAPTCHA, and keep is_anonymous users out of costly features in RLS/server checks.",
+        "examples": {"match": ["await signInAnonymously(auth);", "enable_anonymous_sign_ins = true"], "no_match": ["enable_anonymous_sign_ins = false"]},
+    },
+    # ------------------------------------------------------------------ PAYWALL / REFERRALS
+    {
+        "id": "abuse-client-side-paywall", "check_id": "ABUSE-PAYWALL-001", "title": "Premium content gated only in the UI", "files": ["js", "web"],
+        "pattern": r"(?i)\b(is_?pro|is_?premium|has_?subscription|is_?paid|is_?subscribed|has_?access|plan\s*===?\s*['\"](pro|premium|paid|plus|business))\b[^\n]*(\?|&&)",
+        "path_excludes": r"(?i)(/api/|/server/|\.server\.|/functions/|/actions?/|route\.[jt]s$)", "confidence": "LOW",
+        "note": "Fine for hiding buttons. A finding when the premium data was already sent to the browser (props, API response, RSC payload) and is only hidden.",
+        "examples": {"match": ["{user.isPro ? <FullReport data={report} /> : <Upsell />}"], "no_match": ["const report = await getReportForPlan(user);"]},
+    },
+    {
+        "id": "abuse-referral-reward-unconditional", "check_id": "ABUSE-MULTI-001", "title": "Referral reward granted without a qualifying event", "files": ["code"],
+        "pattern": r"(?i)referr\w*[^\n]*(credit|reward|bonus|balance|coupon|points)\w*\s*(\+=|\+\+|:\s*\{\s*increment|=\s*\w+\s*\+)",
+        "not_near": {"pattern": r"(?i)verified|paid|purchase|subscription|active|fingerprint|self|same|device|ip_?address|!==?\s*\w*referr|first_?payment", "lines": 8},
+        "confidence": "LOW", "note": "Rewarding the sign-up itself invites self-referral farms. Reward after a verified, paying or active referee, once per device/payment method.",
+        "examples": {"match": ["await db.user.update({ where: { id: referrerId }, data: { referralCredits: { increment: 10 } } });"],
+                     "no_match": ["if (referee.firstPaymentAt) await db.user.update({ where: { id: referrerId }, data: { referralCredits: { increment: 10 } } });"]},
+    },
+    # ------------------------------------------------------------------ UGC / BOTS
+    {
+        "id": "abuse-ugc-link-followed", "check_id": "ABUSE-UGC-001", "title": "User-supplied link rendered without rel=\"nofollow ugc\"", "files": ["js", "web"],
+        "pattern": r"<a\s[^>\n]*href=\{?\s*['\"]?\{?\{?\s*[\w.]*(website|homepage|url|link|social|portfolio)\w*",
+        "not_near": {"pattern": r"rel=[\"'{][^\"'}]*(nofollow|ugc|sponsored)", "lines": 1}, "confidence": "LOW",
+        "note": "Followed links on public profiles attract SEO spam accounts. Add rel=\"nofollow ugc noopener\" and consider delaying links for new accounts.",
+        "examples": {"match": ["<a href={profile.website}>{profile.website}</a>"], "no_match": ["<a href={profile.website} rel=\"nofollow ugc noopener\">site</a>"]},
+    },
+    {
+        "id": "abuse-user-agent-bot-check", "check_id": "ABUSE-BOT-001", "title": "Bot detection based on the User-Agent string", "files": ["code"],
+        "pattern": r"(?i)(user-agent|userAgent|HTTP_USER_AGENT)[^\n]*(\.includes|\.test|match|\bin\b|contains|indexOf|=~)[^\n]*(bot|crawl|spider|curl|python|headless|wget|scrapy)",
+        "confidence": "LOW", "note": "The User-Agent is set by the client; abusive scripts change it. Use rate limits, CAPTCHA/Turnstile or a bot-management service for valuable endpoints.",
+        "examples": {"match": ["if (req.headers['user-agent'].includes('curl')) return res.status(403).end();"], "no_match": ["const ua = req.headers['user-agent'];\nlogger.info({ ua });"]},
+    },
+]
