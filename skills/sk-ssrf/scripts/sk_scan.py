@@ -529,7 +529,11 @@ def main(argv=None):
         os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
-        print(f"{result['files_scanned']} files, {len(result['candidates'])} candidates -> {args.out}", file=sys.stderr)
+        # Per-check counts on the summary line let an agent re-check a fix without re-reading the whole file.
+        counts = list(result["counts_by_check"].items())
+        by_check = ", ".join(f"{k} {v}" for k, v in counts[:12]) + (f", +{len(counts) - 12} more" if len(counts) > 12 else "")
+        print(f"{result['files_scanned']} files, {len(result['candidates'])} candidates"
+              f"{f' ({by_check})' if by_check else ''} -> {args.out}", file=sys.stderr)
     else:
         print(text)
     return 0
