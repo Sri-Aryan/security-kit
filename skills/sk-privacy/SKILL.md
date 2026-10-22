@@ -1,6 +1,7 @@
 ---
 name: sk-privacy
 description: Audits personal data handling, covering a data inventory, minimisation, sensitive fields, data sent to analytics and AI providers, tracking consent, export, deletion and retention. Use when the user asks about privacy, GDPR or CCPA readiness, PII, data deletion or retention, or types /sk-privacy.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

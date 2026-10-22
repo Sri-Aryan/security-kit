@@ -1,6 +1,7 @@
 ---
 name: sk-prompt-injection
 description: Audits LLM apps for prompt injection, covering untrusted input channels, system prompt construction, tool permissions and approvals, executing model output, unsafe rendering and memory poisoning. Use when the user asks about prompt injection, jailbreaks or AI tool safety, or types /sk-prompt-injection.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

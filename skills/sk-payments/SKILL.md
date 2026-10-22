@@ -1,6 +1,7 @@
 ---
 name: sk-payments
 description: Audits payment integrations (Stripe, PayPal, Adyen, Paddle and others), covering client-set amounts, fulfilment without verified confirmation, webhook signatures, idempotency, refunds and subscription entitlements. Use when the project takes payments, or types /sk-payments.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
