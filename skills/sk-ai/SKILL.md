@@ -1,6 +1,7 @@
 ---
 name: sk-ai
 description: Audits LLM features against the OWASP Top 10 for LLM Applications, covering model output reaching HTML, SQL or shell, data sent to providers, system prompt leaks, unsafe model loading and cost abuse. Use when the user asks to audit AI, LLM, chatbot, GPT or Claude features, or types /sk-ai.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

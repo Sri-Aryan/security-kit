@@ -1,6 +1,7 @@
 ---
 name: sk-abuse
 description: Finds abuse and fraud gaps where sign-up or free use has value, like bot sign-ups, unverified CAPTCHA, trial and credit farming, free-tier AI and SMS costs, UI-only paywalls and referral abuse. Use when the user asks about fake accounts, bots, trials, spam or fraud, or types /sk-abuse.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

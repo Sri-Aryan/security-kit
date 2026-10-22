@@ -1,6 +1,7 @@
 ---
 name: sk-agents
 description: Audits AI agents, tool calling and MCP servers for over-broad tool permissions, tool input reaching shell, SQL or files, missing human approval, sandboxing and MCP config trust. Use when the project builds agents, tools or MCP servers or configures coding agents, or types /sk-agents.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
