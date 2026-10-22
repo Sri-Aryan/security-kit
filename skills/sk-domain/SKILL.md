@@ -1,6 +1,7 @@
 ---
 name: sk-domain
 description: Audits domain, DNS and email authentication, covering subdomain takeover, wildcard records, SPF, DMARC, DKIM, CAA and security.txt. Use when the user asks about DNS, subdomain takeover, email spoofing or SPF/DKIM/DMARC, or types /sk-domain.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

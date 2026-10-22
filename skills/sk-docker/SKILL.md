@@ -1,6 +1,7 @@
 ---
 name: sk-docker
 description: Audits Dockerfiles, Compose files and Kubernetes manifests for root and privileged containers, exposed Docker sockets, host mounts, unpinned images, baked-in secrets and RBAC. Use when the user asks to audit or harden containers or Kubernetes, or types /sk-docker.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

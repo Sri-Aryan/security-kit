@@ -1,6 +1,7 @@
 ---
 name: sk-design
 description: Runs a secure design review and threat model with attack surface, data-flow diagram, trust boundaries and STRIDE threats, and writes threat-model.md. Use when the user asks for a threat model, design or architecture review, or what could go wrong before building a feature, or types /sk-design.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
