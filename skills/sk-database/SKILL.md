@@ -1,6 +1,7 @@
 ---
 name: sk-database
 description: Audits database security, covering SQL and NoSQL injection, unsafe raw ORM queries, missing tenant scoping, exposed ports and admin UIs, TLS, superuser connections and committed dumps. Use when the user asks about database access, SQL injection, ORM usage or database config, or types /sk-database.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

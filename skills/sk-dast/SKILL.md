@@ -1,6 +1,7 @@
 ---
 name: sk-dast
 description: Runs a dynamic scan (OWASP ZAP or nuclei) against a running app the user owns, then confirms the alerts and traces them to code. Use when the user asks for a DAST, dynamic, black-box or ZAP scan, or to test a running app, or types /sk-dast.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

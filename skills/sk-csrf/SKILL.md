@@ -1,6 +1,7 @@
 ---
 name: sk-csrf
 description: Audits CSRF defences in cookie-authenticated web apps, covering disabled or exempted framework protection, state-changing GET routes, SameSite, Origin checks and CORS with credentials. Use when the user asks about CSRF, XSRF, SameSite or cross-site requests, or types /sk-csrf.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
