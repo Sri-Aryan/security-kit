@@ -1,6 +1,7 @@
 ---
 name: sk-rest
 description: Checks REST APIs against the OWASP REST Security baseline, covering HTTPS, per-endpoint auth, HTTP methods, content types, size limits, errors, security headers and CORS. Use when the user asks for a REST or HTTP hygiene baseline, or types /sk-rest.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

@@ -1,6 +1,7 @@
 ---
 name: sk-saml
 description: Audits SAML 2.0 SSO in the service provider, covering signature checks and wrapping, audience, time and InResponseTo validation, replay, XML parser hardening and RelayState. Use when the project implements SAML SSO, or types /sk-saml.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

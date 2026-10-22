@@ -1,6 +1,7 @@
 ---
 name: sk-secrets
 description: Finds exposed secrets, including hardcoded API keys and passwords, committed .env files and secrets in git history, client bundles, CI logs and Docker images, with a rotation list. Use when the user asks to find leaked or hardcoded secrets or prepare a repo for open-sourcing, or types /sk-secrets.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
