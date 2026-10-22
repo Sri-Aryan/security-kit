@@ -1,12 +1,14 @@
 ---
 name: sk-rest
-description: Audits REST APIs against the OWASP REST Security cheat sheet in any language or framework, covering HTTPS, per-endpoint authentication and authorization, object-level access, JWT validation, API keys, HTTP method allow-lists and verb tampering, out-of-order workflow execution, input validation, request size limits, XXE and unsafe deserialization, request/response content types, exposed management endpoints, error messages, sensitive data in URLs, security headers, CORS, audit logging, status codes and rate limiting. Writes security-report-rest.md. Use when the user asks for a REST API security baseline, HTTP hygiene review, security headers/CORS/content-type checks, or types /sk-rest. For deep business-logic API testing use /sk-api.
+description: Checks REST APIs against the OWASP REST Security baseline, covering HTTPS, per-endpoint auth, HTTP methods, content types, size limits, errors, security headers and CORS. Use when the user asks for a REST or HTTP hygiene baseline, or types /sk-rest.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-rest: REST API security baseline
+
+**Scope.** Audits REST APIs against the OWASP REST Security cheat sheet in any language or framework, covering HTTPS, per-endpoint authentication and authorization, object-level access, JWT validation, API keys, HTTP method allow-lists and verb tampering, out-of-order workflow execution, input validation, request size limits, XXE and unsafe deserialization, request/response content types, exposed management endpoints, error messages, sensitive data in URLs, security headers, CORS, audit logging, status codes and rate limiting. Writes security-report-rest.md. For deep business-logic API testing use /sk-api.
 
 Every request to a REST API should pass the same gates in order: **HTTPS → rate limit → size limit → method
 allowed → content type supported → authenticated → authorized for this action and this record → input

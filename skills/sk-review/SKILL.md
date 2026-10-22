@@ -1,12 +1,14 @@
 ---
 name: sk-review
-description: Fast security review of the current change only (uncommitted work, staged changes, a branch or a pull request) in any language. Runs every installed SecurityKit scanner on just the changed files and keeps hits on added lines, flags removed security controls (auth middleware, permission checks, validation, escaping, CSRF, rate limits, TLS/signature verification), new or changed dependencies (typosquats, unpinned), and security-sensitive files (auth, crypto, payments, CI, containers, IaC, agent/MCP configs), then gives an approve / comment / request-changes verdict. Writes security-report-review.md. Use for everyday code review, before committing or merging, when the user asks to "review my changes/diff/PR for security", or types /sk-review.
+description: Fast security review of only the current change (uncommitted work, a branch or a PR), running every installed scanner on changed files and flagging removed controls and new dependencies. Use for everyday review before commit or merge, or types /sk-review.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-review: security review of a change
+
+**Scope.** Fast security review of the current change only (uncommitted work, staged changes, a branch or a pull request) in any language. Runs every installed SecurityKit scanner on just the changed files and keeps hits on added lines, flags removed security controls (auth middleware, permission checks, validation, escaping, CSRF, rate limits, TLS/signature verification), new or changed dependencies (typosquats, unpinned), and security-sensitive files (auth, crypto, payments, CI, containers, IaC, agent/MCP configs), then gives an approve / comment / request-changes verdict. Writes security-report-review.md.
 
 A diff review answers one question: **does this change add or remove risk?** It stays inside the changed lines and
 their immediate context, so it is fast enough to run on every change. A script works out the diff, runs all installed

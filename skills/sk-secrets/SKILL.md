@@ -1,12 +1,14 @@
 ---
 name: sk-secrets
-description: Finds exposed secrets in any project, including hardcoded API keys, passwords, tokens and private keys in code and config, env-var fallbacks, committed .env files, secrets in git history, secrets shipped to browser or mobile bundles, secrets printed in CI or baked into Docker images, and secrets written to logs. Writes security-report-secrets.md with a rotation list. Use when the user asks to find leaked or hardcoded secrets, API keys or credentials, check .env or git history for keys, prepare a repo for open-sourcing, or types /sk-secrets.
+description: Finds exposed secrets, including hardcoded API keys and passwords, committed .env files and secrets in git history, client bundles, CI logs and Docker images, with a rotation list. Use when the user asks to find leaked or hardcoded secrets or prepare a repo for open-sourcing, or types /sk-secrets.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-secrets: secrets exposure audit
+
+**Scope.** Finds exposed secrets in any project, including hardcoded API keys, passwords, tokens and private keys in code and config, env-var fallbacks, committed .env files, secrets in git history, secrets shipped to browser or mobile bundles, secrets printed in CI or baked into Docker images, and secrets written to logs. Writes security-report-secrets.md with a rotation list.
 
 A secret is exposed as soon as someone who should not have it can read it: anyone with the repository, the
 image, the web bundle or the logs. **Deleting it from the code does not un-expose it. Rotation does.**

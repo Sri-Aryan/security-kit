@@ -1,12 +1,14 @@
 ---
 name: sk-saml
-description: Audits SAML 2.0 single sign-on where the app is the Service Provider (passport-saml/node-saml, samlify, python3-saml, pysaml2, ruby-saml, Spring Security SAML, Sustainsys/ITfoxtec, SimpleSAMLphp or hand-rolled code), covering disabled signature checks, signature wrapping from hand-written XPath/DOM parsing, audience, destination, time and InResponseTo validation, replay caching, XML parser hardening (XXE, canonicalization tricks), certificates taken from KeyInfo instead of metadata, SHA-1, RelayState open redirects, cross-tenant account linking by email or NameID, single logout and vulnerable library versions. Based on the OWASP SAML Security cheat sheet. Writes security-report-saml.md. Use when the project implements SAML SSO and the user asks about its security, or types /sk-saml.
+description: Audits SAML 2.0 SSO in the service provider, covering signature checks and wrapping, audience, time and InResponseTo validation, replay, XML parser hardening and RelayState. Use when the project implements SAML SSO, or types /sk-saml.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-saml: SAML SSO audit
+
+**Scope.** Audits SAML 2.0 single sign-on where the app is the Service Provider (passport-saml/node-saml, samlify, python3-saml, pysaml2, ruby-saml, Spring Security SAML, Sustainsys/ITfoxtec, SimpleSAMLphp or hand-rolled code), covering disabled signature checks, signature wrapping from hand-written XPath/DOM parsing, audience, destination, time and InResponseTo validation, replay caching, XML parser hardening (XXE, canonicalization tricks), certificates taken from KeyInfo instead of metadata, SHA-1, RelayState open redirects, cross-tenant account linking by email or NameID, single logout and vulnerable library versions. Based on the OWASP SAML Security cheat sheet. Writes security-report-saml.md.
 
 A SAML login is a signed XML document saying "this is user X". Every serious SAML bug is a way to make the Service
 Provider accept a document the IdP didn't sign for this SP, now, for this request. This skill checks the app verifies

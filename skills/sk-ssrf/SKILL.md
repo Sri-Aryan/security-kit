@@ -1,12 +1,14 @@
 ---
 name: sk-ssrf
-description: Finds server-side request forgery wherever the server fetches a user-influenced URL in any language (link previews, image/avatar fetch, imports, feeds, renderers, headless browsers, integrations, OIDC discovery, XML/SVG), covering missing allow-lists, private/loopback/metadata IP blocking, DNS rebinding, redirects, non-HTTP schemes, raw-string URL validation, response exposure and timeouts, cloud metadata hardening (IMDSv2), renderer isolation and egress restriction. Based on the OWASP SSRF Prevention cheat sheet. Writes security-report-ssrf.md. Use when the user asks about SSRF, URL fetching, link previews, cloud metadata exposure, or types /sk-ssrf.
+description: Finds server-side request forgery wherever the server fetches a user-influenced URL, covering allow-lists, private and metadata IP blocking, DNS rebinding, redirects and URL schemes. Use when the user asks about SSRF, URL fetching, link previews or cloud metadata, or types /sk-ssrf.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-ssrf: server-side request forgery audit
+
+**Scope.** Finds server-side request forgery wherever the server fetches a user-influenced URL in any language (link previews, image/avatar fetch, imports, feeds, renderers, headless browsers, integrations, OIDC discovery, XML/SVG), covering missing allow-lists, private/loopback/metadata IP blocking, DNS rebinding, redirects, non-HTTP schemes, raw-string URL validation, response exposure and timeouts, cloud metadata hardening (IMDSv2), renderer isolation and egress restriction. Based on the OWASP SSRF Prevention cheat sheet. Writes security-report-ssrf.md.
 
 Every place the server makes a request to a destination a user can influence (URL, host, port, path, redirect, or HTML
 a renderer loads) can be aimed at internal services and cloud metadata. Inventory all such **fetch sites**, then check
