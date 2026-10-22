@@ -1,6 +1,7 @@
 ---
 name: sk-graphql
 description: Audits GraphQL APIs for introspection exposure, missing depth and cost limits, batching and alias abuse, field- and object-level authorization gaps, resolver injection and CSRF. Use when the project has a GraphQL endpoint and the user asks to secure it, or types /sk-graphql.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

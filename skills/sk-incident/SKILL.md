@@ -1,6 +1,7 @@
 ---
 name: sk-incident
 description: Assesses incident readiness and drafts an incident response plan, covering runbooks, on-call, alerting, containment levers, key rotation, tested restores and breach notification. Use when the user asks about incident response, breach readiness, runbooks or backups, or types /sk-incident.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

@@ -1,6 +1,7 @@
 ---
 name: sk-grpc
 description: Audits gRPC services for missing TLS and auth interceptors, per-method authorization, server reflection, unvalidated messages, size limits, deadlines and grpc-web or gateway exposure. Use when the project has gRPC or .proto APIs, or types /sk-grpc.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
