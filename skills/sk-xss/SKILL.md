@@ -1,12 +1,14 @@
 ---
 name: sk-xss
-description: Finds cross-site scripting (reflected, stored and DOM-based) in any web stack, covering raw DOM sinks (innerHTML, insertAdjacentHTML, document.write, jQuery html), framework escaping bypasses (dangerouslySetInnerHTML, v-html, {@html}, bypassSecurityTrust, |safe, mark_safe, html_safe, <%-, {{{ }}}, {!! !!}, Html.Raw, th:utext), disabled template auto-escaping, DOM source-to-sink flows, javascript: URLs, data in script blocks and event handlers, string eval, regex sanitizers, unsafe Markdown, postMessage origin checks, HTML responses echoing input, uploaded SVG/HTML, and Content Security Policy strength. Based on the OWASP XSS Prevention, DOM XSS Prevention and CSP cheat sheets. Writes security-report-xss.md. Use when the user asks about XSS, HTML injection, unsafe rendering or CSP, or types /sk-xss.
+description: Finds cross-site scripting, covering raw DOM sinks, framework escaping bypasses (dangerouslySetInnerHTML, v-html, |safe), disabled auto-escaping, javascript URLs, unsafe Markdown and weak CSP. Use when the user asks about XSS, HTML injection or CSP, or types /sk-xss.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-xss: cross-site scripting audit
+
+**Scope.** Finds cross-site scripting (reflected, stored and DOM-based) in any web stack, covering raw DOM sinks (innerHTML, insertAdjacentHTML, document.write, jQuery html), framework escaping bypasses (dangerouslySetInnerHTML, v-html, {@html}, bypassSecurityTrust, |safe, mark_safe, html_safe, <%-, {{{ }}}, {!! !!}, Html.Raw, th:utext), disabled template auto-escaping, DOM source-to-sink flows, javascript: URLs, data in script blocks and event handlers, string eval, regex sanitizers, unsafe Markdown, postMessage origin checks, HTML responses echoing input, uploaded SVG/HTML, and Content Security Policy strength. Based on the OWASP XSS Prevention, DOM XSS Prevention and CSP cheat sheets. Writes security-report-xss.md.
 
 XSS is untrusted data interpreted as HTML or JavaScript by the browser. Modern frameworks escape output by default, so
 the audit focuses on where that protection is **bypassed** (raw HTML APIs, disabled auto-escaping), **missing** (DOM

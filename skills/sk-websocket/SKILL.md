@@ -1,12 +1,14 @@
 ---
 name: sk-websocket
-description: Audits real-time channels in any stack (WebSockets with ws, Socket.IO, gorilla, Django Channels, Flask-SocketIO, Spring STOMP, SignalR, Phoenix, Action Cable; Server-Sent Events; hosted pub/sub like Pusher, Ably, Supabase Realtime), covering handshake authentication, Origin validation against cross-site WebSocket hijacking, tokens in WebSocket URLs, room/channel joins without permission checks, message parsing and validation, ws:// in production, message size, rate and connection limits, sockets that outlive logout or permission changes, and broadcasts that leak data. Based on the OWASP WebSocket Security cheat sheet. Writes security-report-websocket.md. Use when the project has WebSockets, SSE or real-time features and the user asks about their security, or types /sk-websocket.
+description: Audits WebSockets, SSE and hosted real-time services, covering handshake auth, Origin checks, tokens in URLs, channel authorization, message validation, limits and leaky broadcasts. Use when the project has real-time features, or types /sk-websocket.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-websocket: real-time channel audit
+
+**Scope.** Audits real-time channels in any stack (WebSockets with ws, Socket.IO, gorilla, Django Channels, Flask-SocketIO, Spring STOMP, SignalR, Phoenix, Action Cable; Server-Sent Events; hosted pub/sub like Pusher, Ably, Supabase Realtime), covering handshake authentication, Origin validation against cross-site WebSocket hijacking, tokens in WebSocket URLs, room/channel joins without permission checks, message parsing and validation, ws:// in production, message size, rate and connection limits, sockets that outlive logout or permission changes, and broadcasts that leak data. Based on the OWASP WebSocket Security cheat sheet. Writes security-report-websocket.md.
 
 A WebSocket is one HTTP request followed by hours of messages. So the handshake must authenticate and check Origin,
 and every message must be authorized like an API call. This skill inventories every real-time endpoint and the
