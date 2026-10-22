@@ -1,12 +1,14 @@
 ---
 name: sk-fuzz
-description: Sets up property-based tests and fuzzing for the code that handles untrusted input in any language. Finds and ranks fuzz targets (parsers, decoders, deserializers, validators, sanitizers, binary/offset handling, recursion, regexes, memory-unsafe code), detects existing tooling (fast-check, Hypothesis, Go native fuzzing, cargo-fuzz, libFuzzer, Atheris, Jazzer, Jazzer.js, SharpFuzz, Schemathesis, OSS-Fuzz/ClusterFuzzLite), and checks property quality, coverage-guided harnesses, oracles, timeouts and size limits, sanitizers, corpora and crash regression tests, API schema fuzzing, and CI runs. Writes harnesses and property tests in the project's own tools on request. Writes security-report-fuzz.md. Use when the user asks for fuzzing, property-based tests, parser hardening, or types /sk-fuzz.
+description: Finds code worth fuzzing (parsers, decoders, validators) and sets up property-based tests and coverage-guided fuzzing in the project's own tools. Use when the user asks for fuzzing, property-based tests or parser hardening, or types /sk-fuzz.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-fuzz: property-based tests and fuzzing
+
+**Scope.** Sets up property-based tests and fuzzing for the code that handles untrusted input in any language. Finds and ranks fuzz targets (parsers, decoders, deserializers, validators, sanitizers, binary/offset handling, recursion, regexes, memory-unsafe code), detects existing tooling (fast-check, Hypothesis, Go native fuzzing, cargo-fuzz, libFuzzer, Atheris, Jazzer, Jazzer.js, SharpFuzz, Schemathesis, OSS-Fuzz/ClusterFuzzLite), and checks property quality, coverage-guided harnesses, oracles, timeouts and size limits, sanitizers, corpora and crash regression tests, API schema fuzzing, and CI runs. Writes harnesses and property tests in the project's own tools on request. Writes security-report-fuzz.md.
 
 Generated inputs find what hand-written tests miss: crashes, hangs, memory corruption, ReDoS, round-trip mismatches
 and validator bypasses. This skill finds the code worth fuzzing, checks what is already covered, and sets up the

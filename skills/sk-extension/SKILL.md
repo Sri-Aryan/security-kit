@@ -1,12 +1,14 @@
 ---
 name: sk-extension
-description: Audits browser extensions (Chrome/Edge Manifest V3 and V2, Firefox WebExtensions, Safari web extensions; plain or WXT/Plasmo/CRXJS), covering all-sites host permissions and sensitive permissions (cookies, webRequest, debugger, nativeMessaging, management, history), remotely hosted or eval'd code, weakened extension CSP, externally_connectable and onMessageExternal/postMessage handlers without sender checks, content scripts inserting page data as HTML, broad web_accessible_resources, tokens in storage.sync and shipped client secrets, plain-HTTP backends and custom update URLs. Based on Chrome extension security guidance and Mozilla add-on policies. Writes security-report-extension.md. Use when the project is a browser extension and the user asks about its security or store review risks, or types /sk-extension.
+description: Audits browser extensions (Chrome, Edge, Firefox, Safari) for broad host permissions, remote code, weak extension CSP, unchecked message senders, unsafe content scripts and shipped secrets. Use when the project is a browser extension, or types /sk-extension.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-extension: browser extension audit
+
+**Scope.** Audits browser extensions (Chrome/Edge Manifest V3 and V2, Firefox WebExtensions, Safari web extensions; plain or WXT/Plasmo/CRXJS), covering all-sites host permissions and sensitive permissions (cookies, webRequest, debugger, nativeMessaging, management, history), remotely hosted or eval'd code, weakened extension CSP, externally_connectable and onMessageExternal/postMessage handlers without sender checks, content scripts inserting page data as HTML, broad web_accessible_resources, tokens in storage.sync and shipped client secrets, plain-HTTP backends and custom update URLs. Based on Chrome extension security guidance and Mozilla add-on policies. Writes security-report-extension.md.
 
 An extension can read every page, cookie and request its permissions allow. Users trust those permissions and
 attackers want to borrow them: through remote code, through message handlers any page can call, or through XSS in a

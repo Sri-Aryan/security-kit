@@ -1,12 +1,14 @@
 ---
 name: sk-grpc
-description: Audits gRPC services and clients in any language (Go, Java/Kotlin, Python, Node, C#, Rust/tonic, C++), including grpc-web, gRPC-Gateway and Connect, covering insecure channels and servers without TLS, servers without authentication interceptors, per-method and object-level authorization, server reflection left on, proto3 request messages without validation, oversized message limits, client calls without deadlines, internal errors returned in status messages, grpc-web/gateway CORS and auth, and service-to-service identity (mTLS, SPIFFE). Writes security-report-grpc.md. Use when the project has gRPC services or .proto APIs and the user asks about their security, or types /sk-grpc.
+description: Audits gRPC services for missing TLS and auth interceptors, per-method authorization, server reflection, unvalidated messages, size limits, deadlines and grpc-web or gateway exposure. Use when the project has gRPC or .proto APIs, or types /sk-grpc.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-grpc: gRPC security audit
+
+**Scope.** Audits gRPC services and clients in any language (Go, Java/Kotlin, Python, Node, C#, Rust/tonic, C++), including grpc-web, gRPC-Gateway and Connect, covering insecure channels and servers without TLS, servers without authentication interceptors, per-method and object-level authorization, server reflection left on, proto3 request messages without validation, oversized message limits, client calls without deadlines, internal errors returned in status messages, grpc-web/gateway CORS and auth, and service-to-service identity (mTLS, SPIFFE). Writes security-report-grpc.md.
 
 gRPC services are APIs with different mechanics: authentication lives in interceptors, identity often comes from mTLS,
 schemas are proto files where every field is optional, and the protocol adds reflection, message limits and deadlines.

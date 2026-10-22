@@ -1,12 +1,14 @@
 ---
 name: sk-graphql
-description: Audits GraphQL APIs for security issues in any language or framework, including introspection exposure, missing depth/cost limits, batching and alias abuse, field- and object-level authorization gaps, injection in resolvers, verbose errors and CSRF. Writes security-report-graphql.md with evidence and fixes. Use when the project exposes a GraphQL endpoint or schema and the user asks to audit or secure GraphQL, check GraphQL authorization, or types /sk-graphql.
+description: Audits GraphQL APIs for introspection exposure, missing depth and cost limits, batching and alias abuse, field- and object-level authorization gaps, resolver injection and CSRF. Use when the project has a GraphQL endpoint and the user asks to secure it, or types /sk-graphql.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-graphql: GraphQL security audit
+
+**Scope.** Audits GraphQL APIs for security issues in any language or framework, including introspection exposure, missing depth/cost limits, batching and alias abuse, field- and object-level authorization gaps, injection in resolvers, verbose errors and CSRF. Writes security-report-graphql.md with evidence and fixes.
 
 GraphQL security comes down to a few concepts that apply to every server, whatever the language:
 **who is the caller** (context), **what may they ask for** (validation: depth, cost, batching,

@@ -1,12 +1,14 @@
 ---
 name: sk-incident
-description: Assesses incident readiness for the system a repository builds and drafts an incident response plan, covering a written plan and runbooks (leaked secrets, account takeover, data exposure, compromised dependencies, ransomware), on-call and security contacts, alerting and paging, logs and audit trails for investigations, containment levers (revoking sessions and tokens, disabling accounts and keys), secret and key rotation procedures, backups and tested restores, breach notification duties and deadlines, and exercises. Combines repository evidence with a short interview. Writes security-report-incident.md and incident-response-plan.md. Use when the user asks about incident response, breach readiness, runbooks, on-call, backups and restore, or types /sk-incident.
+description: Assesses incident readiness and drafts an incident response plan, covering runbooks, on-call, alerting, containment levers, key rotation, tested restores and breach notification. Use when the user asks about incident response, breach readiness, runbooks or backups, or types /sk-incident.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-incident: incident readiness and response plan
+
+**Scope.** Assesses incident readiness for the system a repository builds and drafts an incident response plan, covering a written plan and runbooks (leaked secrets, account takeover, data exposure, compromised dependencies, ransomware), on-call and security contacts, alerting and paging, logs and audit trails for investigations, containment levers (revoking sessions and tokens, disabling accounts and keys), secret and key rotation procedures, backups and tested restores, breach notification duties and deadlines, and exercises. Combines repository evidence with a short interview. Writes security-report-incident.md and incident-response-plan.md.
 
 Every system eventually has a bad day. What matters then: does someone get paged, are there logs to investigate, can
 sessions be revoked and secrets rotated in minutes, do backups restore, and does everyone know who to notify by when?
