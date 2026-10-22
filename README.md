@@ -49,6 +49,12 @@ In your agent, inside the project:
 
 ## Skills
 
+Your agent can start the five **workflow** commands on its own from a plain request ("audit this project", "review
+my change"). Every other skill runs when you type its command, or when you ask about one area ("check my JWT
+handling") and `/sk-audit` picks the matching skill for you. In Claude Code, only the workflow descriptions are loaded
+into every conversation (about 1 KB instead of 20 KB), so having SecurityKit installed costs almost nothing in
+sessions that don't use it. (Codex doesn't read the `disable-model-invocation` setting, so it still lists every skill.)
+
 <!-- catalog:start (generated from skills/catalog.json by tools/gen_catalog_docs.py; do not edit by hand) -->
 ### Workflows
 
@@ -213,7 +219,8 @@ Dynamic checks (`--base-url`) only ever target localhost or a host you confirm y
 
 Your agent caches the conversation automatically: everything already in it (skill instructions, guides, scan
 results) is re-billed at a tenth of the normal input price or less on later turns, as long as the start of the
-conversation stays the same. SecurityKit is written to keep it that way: skill descriptions are short and fixed,
+conversation stays the same. SecurityKit is written to keep it that way: in Claude Code only the five workflow skills
+put a description in every conversation (the others set `disable-model-invocation`), descriptions are short and fixed,
 scanner output is byte-for-byte stable between runs, and skills read each file once. You can help:
 
 - **Run related skills in one session.** `/sk-audit` then `/sk-fix` in the same conversation reuses everything

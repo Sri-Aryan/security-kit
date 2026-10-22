@@ -1,6 +1,6 @@
 ---
 name: sk-audit
-description: Runs a full SecurityKit audit, detects which skills apply, runs each one and merges the reports into one deduplicated, prioritised report with an overall score. Use when the user asks for a full or complete security audit or an overall score, or types /sk-audit.
+description: Runs a full SecurityKit audit, detects which skills apply, runs each one and merges the reports into one deduplicated, prioritised report with an overall score. Use when the user asks for a full or complete security audit or an overall score, or types /sk-audit. Also use when the user asks to security-check one area (auth, JWT, OAuth, SQL injection, XSS, SSRF, uploads, payments, rate limits, LLM or agents, secrets, dependencies, Docker, cloud, CI) without typing an /sk- command; it runs the matching SecurityKit skill.
 metadata:
   version: 0.1.0
   author: SecurityKit
@@ -41,6 +41,20 @@ Use `python3` (or `python` / `py -3`).
 | `--only a,b` / `--skip a,b` | Restrict or exclude skills (names without `sk-` are fine). |
 | `--base-url <url>` | Enable dynamic checks in skills that support them (ownership confirmation required). |
 | `--merge-only` | Don't run skills; just merge the reports already in `.securitykit/` (e.g. after `/sk-fix`). |
+
+## One area
+
+The specialist skills (`/sk-xss`, `/sk-tokens`, ...) run when the user types their command; agents don't pick them
+on their own, which keeps their descriptions out of every session. So when the user asks about **one area** ("check
+my JWT handling", "any SQL injection here?") rather than the whole project, this skill routes the request:
+
+1. Find the skill(s) for that area in the grouped tables in `$SKILL/../sk-help/SKILL.md` (at most three; prefer the
+   narrowest match, e.g. `sk-tokens` for JWTs, not `sk-auth`).
+2. Tell the user in one line which skill you are running and its command for next time (e.g. "Running `/sk-tokens`
+   (JWT verification, token storage, refresh rotation). Next time you can type it directly.").
+3. Read that skill's `SKILL.md` (`$SKILL/../sk-<name>/SKILL.md`) and follow it to the end, with any options the user
+   gave. No plan step, no confirmation and no merge. If the skill isn't installed, say so and give the install
+   command (`npx github:getsecuritykit/kit init --skills sk-<name>`).
 
 ## Steps
 
