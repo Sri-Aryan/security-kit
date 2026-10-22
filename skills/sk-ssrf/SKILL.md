@@ -1,6 +1,7 @@
 ---
 name: sk-ssrf
 description: Finds server-side request forgery wherever the server fetches a user-influenced URL, covering allow-lists, private and metadata IP blocking, DNS rebinding, redirects and URL schemes. Use when the user asks about SSRF, URL fetching, link previews or cloud metadata, or types /sk-ssrf.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

@@ -1,6 +1,7 @@
 ---
 name: sk-tests
 description: Finds missing security tests (unauthenticated access, cross-user IDOR, roles, invalid input, rate limits, regressions) and generates them in the project's own test framework. Use when the user asks which security paths are untested or to add security tests, or types /sk-tests.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

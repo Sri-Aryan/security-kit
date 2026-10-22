@@ -1,6 +1,7 @@
 ---
 name: sk-tokens
 description: Audits tokens and API keys, covering JWT verification (alg none, algorithm confusion, weak keys, missing expiry or audience), token randomness, storage, refresh rotation and comparison. Use when the project issues or accepts JWTs, API keys or session tokens, or types /sk-tokens.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
