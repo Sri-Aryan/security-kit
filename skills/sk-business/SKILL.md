@@ -1,6 +1,7 @@
 ---
 name: sk-business
 description: Audits business logic abuse, covering client-controlled prices, negative quantities, coupon and trial reuse, skipped workflow steps, self-approval and refund bounds. Use when the user asks about logic flaws, price tampering, coupon abuse, checkout or workflow security, or types /sk-business.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

@@ -1,6 +1,7 @@
 ---
 name: sk-browser
 description: Audits browser-side protections, covering security headers, clickjacking, cookie attributes, tokens in localStorage, secrets in client bundles, third-party scripts and SRI. Use when the user asks about security headers, cookies, clickjacking, front-end secrets or third-party scripts, or types /sk-browser.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

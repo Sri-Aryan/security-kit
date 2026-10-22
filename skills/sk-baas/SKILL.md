@@ -1,6 +1,7 @@
 ---
 name: sk-baas
 description: Audits Supabase, Firebase and other backend-as-a-service apps, covering row level security, Firestore and Storage rules, service_role and admin keys in clients, public buckets, functions and realtime. Use when the user asks about Supabase, Firebase, RLS or security rules, or types /sk-baas.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
