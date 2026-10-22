@@ -1,6 +1,7 @@
 ---
 name: sk-cloud
 description: Audits Terraform, CloudFormation/CDK, Pulumi, Bicep and Serverless config on AWS, Azure or GCP for public buckets, wildcard IAM, open ports, missing encryption and logging, and secrets in state. Use when the user asks about cloud or IaC security, or types /sk-cloud.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

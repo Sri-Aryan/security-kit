@@ -1,6 +1,7 @@
 ---
 name: sk-cicd
 description: Audits CI/CD pipelines (GitHub Actions, GitLab CI, Jenkins and others) for untrusted code in privileged triggers, script injection, token permissions, unpinned actions, secrets in logs and runners. Use when the user asks about pipeline, workflow or supply-chain security, or types /sk-cicd.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

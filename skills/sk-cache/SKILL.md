@@ -1,6 +1,7 @@
 ---
 name: sk-cache
 description: Audits CDN, framework and application caches for user data cached publicly, cache poisoning through unkeyed headers, cache deception and shared cache keys. Use when the user asks about caching, CDN configuration, cache poisoning or deception, or types /sk-cache.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
