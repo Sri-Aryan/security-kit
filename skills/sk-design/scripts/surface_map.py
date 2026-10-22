@@ -22,6 +22,8 @@ import re
 import sys
 from collections import OrderedDict
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", "target", "out", ".next", ".nuxt", "__pycache__",
              ".venv", "venv", "env", ".tox", ".securitykit", ".claude", ".codex", "coverage", ".idea", ".vscode",
@@ -151,7 +153,7 @@ def main(argv=None):
     result = scan(args.root)
     text = json.dumps(result, indent=2) if args.format == "json" else to_markdown(result)
     if args.out:
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"surface: {result['summary']} -> {args.out}", file=sys.stderr)
