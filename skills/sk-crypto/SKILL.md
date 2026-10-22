@@ -1,6 +1,7 @@
 ---
 name: sk-crypto
 description: Audits cryptography use, covering weak algorithms, ECB and unauthenticated modes, reused IVs, hardcoded keys, weak randomness, timing-unsafe comparisons, TLS settings and key management. Use when the user asks about encryption, keys, integrity hashing or TLS, or types /sk-crypto.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

@@ -1,6 +1,7 @@
 ---
 name: sk-compliance
 description: Maps SecurityKit findings to SOC 2, ISO 27001, PCI DSS, HIPAA and GDPR controls and lists the evidence to collect (indicative, not a certification). Use when the user prepares for a compliance audit or security questionnaire, or types /sk-compliance.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

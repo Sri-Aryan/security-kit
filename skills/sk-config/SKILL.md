@@ -1,6 +1,7 @@
 ---
 name: sk-config
 description: Audits production misconfiguration, covering debug mode, stack traces sent to clients, exposed admin and diagnostic endpoints, default credentials, placeholder secrets and directory listing. Use when the user asks about misconfiguration, hardening, debug mode or error pages, or types /sk-config.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
