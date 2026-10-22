@@ -1,0 +1,243 @@
+"""sk-baas rules: Supabase RLS and keys, Firebase/Firestore rules, storage, functions, other backends-as-a-service."""
+
+SKILL = "sk-baas"
+
+MACROS = {
+    # Code that runs in the browser or a mobile client.
+    "CLIENT_FILE": r"(?:^|\n)[ \t]*['\"]use client['\"]",
+    # Server-side checks that the caller is signed in.
+    "BAAS_AUTH": r"(?i:auth\.getUser\(|getClaims\(|getServerSession|verifyIdToken|context\.auth|request\.auth|ctx\.auth|getUserIdentity|currentUser|requireUser|requireAuth|auth\(\)|getAuth\(|verifySession|Authorization)",
+}
+
+RULES = [
+    # ------------------------------------------------------------------ RLS (Supabase / Postgres)
+    {
+        "id": "baas-table-without-rls", "check_id": "BAAS-RLS-001", "type": "absence", "scope": "file",
+        "title": "Migration creates public tables but never enables row level security", "files": ["sql"],
+        "path_includes": r"supabase",
+        "when": r"(?i)create\s+table\s+(?:if\s+not\s+exists\s+)?(?:(?:public|\"public\")\.|(?![\w\"]+\.))",
+        "missing": r"(?i)enable\s+row\s+level\s+security",
+        "confidence": "HIGH",
+        "note": "Tables in exposed schemas without RLS are readable and writable by anyone holding the public anon key. RLS may be enabled in a later migration: confirm per table.",
+        "examples": {"match": ["create table public.profiles (id uuid primary key, email text);"],
+                     "no_match": ["create table public.profiles (id uuid primary key);\nalter table public.profiles enable row level security;",
+                                  "create table private.audit (id bigint);"]},
+    },
+    {
+        "id": "baas-rls-disabled", "check_id": "BAAS-RLS-001", "title": "Row level security explicitly disabled", "files": ["sql", "code"],
+        "pattern": r"(?i)disable\s+row\s+level\s+security", "confidence": "HIGH",
+        "note": "Often added to make a failing query work. Fix the policy instead.",
+        "examples": {"match": ["alter table public.orders disable row level security;"], "no_match": ["alter table public.orders enable row level security;"]},
+    },
+    {
+        "id": "baas-policy-true", "check_id": "BAAS-RLS-002", "title": "RLS policy that allows every row (using/with check true)", "files": ["sql"],
+        "pattern": r"(?i)\b(using|with\s+check)\s*\(\s*true\s*\)", "confidence": "MEDIUM",
+        "note": "Fine for genuinely public read-only data (e.g. a product catalogue); a finding for anything user-owned or for insert/update/delete.",
+        "examples": {"match": ["create policy \"all\" on public.notes for all using (true) with check (true);"],
+                     "no_match": ["create policy \"own\" on public.notes for select using ((select auth.uid()) = user_id);"]},
+    },
+    {
+        "id": "baas-policy-any-signed-in", "check_id": "BAAS-RLS-003", "title": "RLS policy only checks that the user is signed in", "files": ["sql"],
+        "pattern": r"(?i)using\s*\(\s*\(?\s*(auth\.role\(\)\s*=\s*'authenticated'|\(?\s*(select\s+)?auth\.uid\(\)\s*\)?\s+is\s+not\s+null)\s*\)?\s*\)",
+        "confidence": "MEDIUM", "note": "Every signed-up user (sign-up is usually open) can read or change every row. Scope rows to auth.uid() or a membership table.",
+        "examples": {"match": ["create policy \"read\" on public.invoices for select using (auth.role() = 'authenticated');",
+                               "create policy \"read\" on public.invoices for select using (auth.uid() is not null);"],
+                     "no_match": ["create policy \"read\" on public.invoices for select using (auth.uid() = owner_id);"]},
+    },
+    {
+        "id": "baas-policy-user-metadata", "check_id": "BAAS-RLS-003", "title": "Authorization based on user-editable metadata", "files": ["sql", "code"],
+        "pattern": r"(?i)auth\.jwt\(\)\s*->+\s*'user_metadata'|raw_user_meta_data\s*->>?\s*'(role|is_?admin|admin|plan|tier|permissions?)'",
+        "confidence": "HIGH", "note": "user_metadata can be changed by the user with supabase.auth.updateUser(). Use app_metadata or a table only the server writes.",
+        "examples": {"match": ["using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin')", "insert into public.profiles (role) values (new.raw_user_meta_data ->> 'role');"],
+                     "no_match": ["using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')"]},
+    },
+    {
+        "id": "baas-update-policy-no-check", "check_id": "BAAS-RLS-004", "title": "UPDATE policy without WITH CHECK", "files": ["sql"],
+        "multiline": True,
+        "pattern": r"(?is)create\s+policy[^;]*?\bfor\s+update\b(?:(?!with\s+check)[^;])*;",
+        "confidence": "LOW", "note": "Without WITH CHECK the row can be updated into a state the user should not own (e.g. changing user_id or role). Also restrict updatable columns with column grants or a trigger.",
+        "examples": {"match": ["create policy \"upd\" on public.profiles for update using (auth.uid() = id);"],
+                     "no_match": ["create policy \"upd\" on public.profiles for update using (auth.uid() = id) with check (auth.uid() = id);"]},
+    },
+    # ------------------------------------------------------------------ KEYS
+    {
+        "id": "baas-admin-key-public-env", "check_id": "BAAS-KEY-001", "title": "Admin/service key in a public (client-bundled) env variable", "files": ["code", "web", "env", "config"],
+        "pattern": r"(?i)\b(NEXT_PUBLIC_|VITE_|REACT_APP_|EXPO_PUBLIC_|NUXT_PUBLIC_|PUBLIC_|GATSBY_)\w*(SERVICE_ROLE|SERVICE_KEY|SECRET_KEY|SUPABASE_SECRET|ADMIN_KEY|FIREBASE_PRIVATE_KEY|PRIVATE_KEY)\w*",
+        "confidence": "HIGH", "note": "Anything with a public prefix is shipped to every visitor. The service_role / secret key bypasses RLS entirely: rotate it.",
+        "examples": {"match": ["NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=placeholder", "const sb = createClient(url, import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY);"],
+                     "no_match": ["NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder", "const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY);"]},
+    },
+    {
+        "id": "baas-admin-sdk-in-client-component", "check_id": "BAAS-KEY-001", "title": "Admin SDK or service key used in a client component", "files": ["js"],
+        "pattern": r"(?i)service_?role|SUPABASE_SECRET|sb_secret_|from\s+['\"]firebase-admin|require\(\s*['\"]firebase-admin|from\s+['\"]node-appwrite",
+        "file_requires": "{{CLIENT_FILE}}", "confidence": "HIGH",
+        "examples": {"match": ["'use client';\nconst sb = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY);"],
+                     "no_match": ["const sb = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY);"]},
+    },
+    {
+        "id": "baas-admin-sdk-in-frontend-path", "check_id": "BAAS-KEY-001", "title": "Admin SDK or service key referenced from frontend code", "files": ["js", "dart", "swift", "kt"],
+        "pattern": r"(?i)service_?role|SUPABASE_SECRET|sb_secret_|from\s+['\"]firebase-admin|require\(\s*['\"]firebase-admin|from\s+['\"]node-appwrite",
+        "path_includes": r"(?i)(^|/)(components|hooks|views|screens|client|frontend|widgets|composables|ui)/",
+        "path_excludes": r"(?i)(/api/|/server/|\.server\.|/functions/|/actions?/)", "confidence": "MEDIUM",
+        "examples": {"match": ["export const admin = createClient(URL, SUPABASE_SERVICE_ROLE_KEY);"], "no_match": ["export const sb = createClient(URL, SUPABASE_ANON_KEY);"]},
+    },
+    {
+        "id": "baas-admin-client-no-auth", "check_id": "BAAS-KEY-002", "title": "RLS-bypassing admin client created; confirm callers check the user", "files": ["js", "py", "dart"],
+        "pattern": r"(?i)createClient\([^)\n]*(SERVICE_ROLE|SECRET_KEY|sb_secret)|create_client\([^)\n]*(SERVICE_ROLE|SECRET_KEY)|initializeApp\(\s*\{[^}\n]*credential\s*:\s*(admin\.)?credential\.cert|admin\.initializeApp\(",
+        "not_near": {"pattern": "{{BAAS_AUTH}}", "lines": 15}, "confidence": "LOW",
+        "note": "Admin clients ignore RLS and security rules. Every route, action or function that uses this client must authenticate the caller and scope queries to them. Check each importer.",
+        "examples": {"match": ["export const supabaseAdmin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!);"],
+                     "no_match": ["const { data: { user } } = await supabase.auth.getUser();\nif (!user) return unauthorized();\nconst admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!);"]},
+    },
+    # ------------------------------------------------------------------ FUNCTIONS / VIEWS
+    {
+        "id": "baas-security-definer-no-search-path", "check_id": "BAAS-FUNC-001", "title": "SECURITY DEFINER function without a fixed search_path", "files": ["sql"],
+        "pattern": r"(?i)\bsecurity\s+definer\b", "not_near": {"pattern": r"(?i)set\s+search_path", "lines": 6}, "confidence": "MEDIUM",
+        "note": "Definer functions run with the owner's rights and bypass RLS. Pin search_path (set search_path = ''), check auth.uid() inside, and keep them out of exposed schemas unless they are meant to be called.",
+        "examples": {"match": ["create function public.make_admin(uid uuid) returns void language sql security definer as $$ update profiles set role='admin' where id=uid $$;"],
+                     "no_match": ["create function private.f() returns void language plpgsql security definer set search_path = '' as $$ begin end $$;"]},
+    },
+    {
+        "id": "baas-execute-granted-to-anon", "check_id": "BAAS-FUNC-001", "title": "Function execute granted to anon/public", "files": ["sql"],
+        "pattern": r"(?i)grant\s+execute\s+on\s+function[^;]*\bto\s+(anon|public)\b", "confidence": "LOW",
+        "examples": {"match": ["grant execute on function public.reset_balance(uuid) to anon;"], "no_match": ["revoke execute on function public.reset_balance(uuid) from anon, public;"]},
+    },
+    {
+        "id": "baas-view-bypasses-rls", "check_id": "BAAS-FUNC-001", "title": "View in an exposed schema without security_invoker", "files": ["sql"],
+        "path_includes": r"supabase",
+        "pattern": r"(?i)create\s+(or\s+replace\s+)?view\s+(?:(?:public|\"public\")\.|(?![\w\"]+\.))",
+        "not_near": {"pattern": r"(?i)security_invoker", "lines": 2}, "confidence": "MEDIUM",
+        "note": "Postgres views run as their owner by default, so they skip the underlying tables' RLS. Use `with (security_invoker = true)` (Postgres 15+) or move the view to an unexposed schema.",
+        "examples": {"match": ["create view public.order_totals as select user_id, sum(total) from orders group by 1;"],
+                     "no_match": ["create view public.order_totals with (security_invoker = true) as select user_id, sum(total) from orders group by 1;"]},
+    },
+    {
+        "id": "baas-callable-no-auth", "check_id": "BAAS-FUNC-002", "title": "Firebase callable/HTTP function without an auth check", "files": ["js", "py"],
+        "pattern": r"\bonCall\(|\bhttps\.onCall\(|\bon_call\(|https_fn\.on_call|\bonRequest\(|https\.onRequest\(",
+        "not_near": {"pattern": r"(?i)(context\.auth|request\.auth|req\.auth|verifyIdToken|enforceAppCheck|authorization|webhook|signature)", "lines": 12},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["export const deleteUser = onCall(async (request) => {\n  await admin.auth().deleteUser(request.data.uid);\n});"],
+                     "no_match": ["export const deleteUser = onCall(async (request) => {\n  if (!request.auth) throw new HttpsError('unauthenticated', 'login');\n});"]},
+    },
+    {
+        "id": "baas-edge-function-verify-jwt-off", "check_id": "BAAS-FUNC-002", "title": "Supabase Edge Function with JWT verification disabled", "files": [".toml", ".ts", ".js"],
+        "pattern": r"(?i)verify_jwt\s*=\s*false|--no-verify-jwt", "confidence": "MEDIUM",
+        "note": "Fine for webhooks that verify their own signature; otherwise anyone can call the function.",
+        "examples": {"match": ["[functions.send-invoice]\nverify_jwt = false"], "no_match": ["[functions.send-invoice]\nverify_jwt = true"]},
+    },
+    # ------------------------------------------------------------------ FIRESTORE / RTDB / STORAGE RULES
+    {
+        "id": "baas-firestore-open-rule", "check_id": "BAAS-FS-001", "title": "Security rule that allows everyone (if true / no condition / test mode)", "files": [".rules"],
+        "pattern": r"(?i)allow\s+[\w\s,]+:\s*if\s+true\s*;|allow\s+(read|write|get|list|create|update|delete)(\s*,\s*\w+)*\s*;|request\.time\s*<\s*timestamp\.date\(",
+        "confidence": "HIGH", "note": "`allow read;` with no condition, `if true`, and the 30-day test-mode rule all grant access to anyone with the project ID (which is public).",
+        "examples": {"match": ["allow read, write: if true;", "allow read;", "allow read, write: if request.time < timestamp.date(2026, 1, 1);"],
+                     "no_match": ["allow read: if request.auth != null && request.auth.uid == userId;"]},
+    },
+    {
+        "id": "baas-rtdb-open-rule", "check_id": "BAAS-FS-001", "title": "Realtime Database rule that allows everyone", "files": [".json", ".rules"],
+        "path_includes": r"(?i)rules",
+        "pattern": r"\"\.(read|write)\"\s*:\s*(true|\"true\")", "confidence": "HIGH",
+        "examples": {"match": ["{ \"rules\": { \".read\": true, \".write\": true } }"], "no_match": ["{ \"rules\": { \"users\": { \"$uid\": { \".read\": \"auth.uid === $uid\" } } } }"]},
+    },
+    {
+        "id": "baas-firestore-auth-only", "check_id": "BAAS-FS-002", "title": "Security rule only checks that the user is signed in", "files": [".rules"],
+        "pattern": r"(?i)allow\s+[\w\s,]+:\s*if\s+request\.auth\s*!=\s*null\s*;", "confidence": "MEDIUM",
+        "note": "Anyone can create an account, so this is close to public. Compare request.auth.uid with the document owner.",
+        "examples": {"match": ["allow read, write: if request.auth != null;"], "no_match": ["allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;"]},
+    },
+    {
+        "id": "baas-firestore-recursive-wildcard", "check_id": "BAAS-FS-002", "title": "Rule on a recursive wildcard (applies to every collection)", "files": [".rules"],
+        "pattern": r"match\s+/\{\w+=\*\*\}", "confidence": "LOW",
+        "examples": {"match": ["match /{document=**} {"], "no_match": ["match /users/{userId} {"]},
+    },
+    {
+        "id": "baas-firestore-write-no-validation", "check_id": "BAAS-FS-003", "type": "absence", "scope": "file",
+        "title": "Write rules never validate the incoming data", "files": [".rules"],
+        "when": r"allow\s+[\w\s,]*(write|create|update)", "missing": r"request\.resource\.data",
+        "confidence": "LOW", "note": "Without request.resource.data checks a user can write any field, including role, plan, credits or ownerId.",
+        "examples": {"match": ["allow create, update: if request.auth.uid == userId;"],
+                     "no_match": ["allow update: if request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']);"]},
+    },
+    {
+        "id": "baas-public-bucket", "check_id": "BAAS-STORAGE-001", "title": "Public storage bucket", "files": ["sql", "code"],
+        "pattern": r"(?i)createBucket\([^)]*public\s*:\s*true|insert\s+into\s+storage\.buckets[^;]*\btrue\b",
+        "confidence": "MEDIUM", "note": "Public buckets serve every object to anyone with the URL. Keep user uploads private and hand out signed URLs.",
+        "examples": {"match": ["await supabase.storage.createBucket('avatars', { public: true });", "insert into storage.buckets (id, name, public) values ('docs', 'docs', true);"],
+                     "no_match": ["await supabase.storage.createBucket('invoices', { public: false });"]},
+    },
+    {
+        "id": "baas-public-bucket-config", "check_id": "BAAS-STORAGE-001", "title": "Public storage bucket in Supabase config", "files": [".toml"],
+        "pattern": r"(?i)^\s*public\s*=\s*true", "near": {"pattern": r"(?i)\[storage\.buckets\.", "lines": 4}, "confidence": "MEDIUM",
+        "examples": {"match": ["[storage.buckets.invoices]\npublic = true"], "no_match": ["[storage.buckets.invoices]\npublic = false"]},
+    },
+    {
+        "id": "baas-storage-policy-bucket-only", "check_id": "BAAS-STORAGE-001", "title": "Storage policy scoped to a bucket but not to the user's folder", "files": ["sql"],
+        "pattern": r"(?i)on\s+storage\.objects[^;]*bucket_id\s*=\s*'[\w-]+'\s*\)", "not_near": {"pattern": r"(?i)auth\.uid\(\)|storage\.foldername|owner", "lines": 3},
+        "confidence": "MEDIUM",
+        "examples": {"match": ["create policy \"read docs\" on storage.objects for select to authenticated using (bucket_id = 'docs');"],
+                     "no_match": ["create policy \"read own\" on storage.objects for select using (bucket_id = 'docs' and (storage.foldername(name))[1] = auth.uid()::text);"]},
+    },
+    # ------------------------------------------------------------------ AUTH SETTINGS / APP CHECK / REALTIME
+    {
+        "id": "baas-email-confirm-off", "check_id": "BAAS-AUTH-001", "title": "Email confirmation disabled in Supabase auth config", "files": [".toml"],
+        "path_includes": r"supabase", "pattern": r"(?i)^\s*enable_confirmations\s*=\s*false", "near": {"pattern": r"(?i)\[auth\.email\]", "lines": 12},
+        "confidence": "LOW", "note": "config.toml drives local development; check the hosted project's Auth settings too. Without confirmation anyone can sign up as someone else's email.",
+        "examples": {"match": ["[auth.email]\nenable_signup = true\nenable_confirmations = false"], "no_match": ["[auth.email]\nenable_confirmations = true"]},
+    },
+    {
+        "id": "baas-weak-min-password", "check_id": "BAAS-AUTH-001", "title": "Short minimum password length in auth config", "files": [".toml"],
+        "path_includes": r"supabase", "pattern": r"(?i)^\s*minimum_password_length\s*=\s*[0-7]\s*$", "confidence": "LOW",
+        "examples": {"match": ["minimum_password_length = 6"], "no_match": ["minimum_password_length = 12"]},
+    },
+    {
+        "id": "baas-no-app-check", "check_id": "BAAS-APPCHECK-001", "type": "absence", "scope": "project",
+        "title": "Firebase client without App Check", "files": ["js", "dart", "swift", "kt", "java"],
+        "when": r"from\s+['\"]firebase/app['\"]|firebase_core|FirebaseApp\.configure\(|FirebaseApp\.initializeApp\(",
+        "missing": r"(?i)initializeAppCheck|FirebaseAppCheck|AppCheck|app_check|appCheck",
+        "confidence": "LOW", "note": "App Check doesn't replace security rules, but it blocks scripted abuse of your backend from outside your app.",
+        "examples": {"match": ["import { initializeApp } from 'firebase/app';\nconst app = initializeApp(config);"],
+                     "no_match": ["import { initializeApp } from 'firebase/app';\nimport { initializeAppCheck } from 'firebase/app-check';"]},
+    },
+    {
+        "id": "baas-realtime-public-channel", "check_id": "BAAS-REALTIME-001", "title": "Supabase Realtime broadcast/presence channel that is not private", "files": ["js", "dart"],
+        "pattern": r"\.channel\(\s*[`'\"]", "near": {"pattern": r"(?i)broadcast|presence", "lines": 6},
+        "not_near": {"pattern": r"private\s*:\s*true", "lines": 4}, "confidence": "LOW",
+        "note": "Public channels can be joined by anyone with the anon key. Use `config: { private: true }` with realtime.messages RLS policies.",
+        "examples": {"match": ["const ch = supabase.channel(`room:${id}`)\n  .on('broadcast', { event: 'msg' }, cb)"],
+                     "no_match": ["const ch = supabase.channel(`room:${id}`, { config: { private: true } })\n  .on('broadcast', { event: 'msg' }, cb)"]},
+    },
+    {
+        "id": "baas-realtime-publication", "check_id": "BAAS-REALTIME-001", "title": "Table added to the Realtime publication", "files": ["sql"],
+        "pattern": r"(?i)alter\s+publication\s+supabase_realtime\s+add\s+table", "confidence": "LOW",
+        "note": "Changes are delivered according to the table's RLS select policy: confirm RLS is on and scoped for this table.",
+        "examples": {"match": ["alter publication supabase_realtime add table public.messages;"], "no_match": ["alter table public.messages enable row level security;"]},
+    },
+    # ------------------------------------------------------------------ OTHER BAAS
+    {
+        "id": "baas-appwrite-any-role", "check_id": "BAAS-OTHER-001", "title": "Appwrite permission granted to any user or guests", "files": ["code"],
+        "pattern": r"Permission\.(read|write|update|delete|create)\(\s*Role\.(any|guests)\(\)\s*\)|['\"](read|write|update|delete)\(\\?\"any\\?\"\)['\"]",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["[Permission.write(Role.any())]"], "no_match": ["[Permission.write(Role.user(userId))]"]},
+    },
+    {
+        "id": "baas-pocketbase-empty-rule", "check_id": "BAAS-OTHER-001", "title": "PocketBase collection rule set to \"\" (anyone)", "files": ["js", ".json"],
+        "pattern": r"[\"']?(listRule|viewRule|createRule|updateRule|deleteRule)[\"']?\s*[:=]\s*(\"\"|'')",
+        "confidence": "MEDIUM", "note": "In PocketBase an empty rule means anyone (even unauthenticated); null means superusers only.",
+        "examples": {"match": ["\"listRule\": \"\",", "collection.updateRule = ''"], "no_match": ["\"listRule\": \"@request.auth.id = user\","]},
+    },
+    {
+        "id": "baas-convex-no-auth", "check_id": "BAAS-OTHER-001", "type": "absence", "scope": "file",
+        "title": "Convex mutation/query file with no auth check", "files": ["js"], "path_includes": r"(?i)(^|/)convex/",
+        "when": r"\b(mutation|query|action)\(\s*\{",
+        "missing": r"ctx\.auth|getUserIdentity|getAuthUserId|requireUser|internalMutation|internalQuery",
+        "confidence": "LOW", "note": "Public Convex functions are callable by anyone with the deployment URL. Use internal* for server-only functions.",
+        "examples": {"match": ["export const remove = mutation({ args: { id: v.id('notes') }, handler: async (ctx, { id }) => ctx.db.delete(id) });"],
+                     "no_match": ["export const remove = mutation({ handler: async (ctx, { id }) => { const me = await ctx.auth.getUserIdentity(); } });"]},
+    },
+    {
+        "id": "baas-amplify-public", "check_id": "BAAS-OTHER-001", "title": "Amplify data model open to the public", "files": ["js", ".graphql"],
+        "pattern": r"allow\.(publicApiKey|guest)\(\)(?!\s*\.to\(\s*\[\s*['\"]read['\"]\s*\]\))|\{\s*allow\s*:\s*public\s*[,}]", "confidence": "MEDIUM",
+        "examples": {"match": ["authorization: (allow) => [allow.publicApiKey()]", "type Todo @model @auth(rules: [{ allow: public }]) {"],
+                     "no_match": ["authorization: (allow) => [allow.owner()]", "authorization: (allow) => [allow.publicApiKey().to(['read'])]"]},
+    },
+]
