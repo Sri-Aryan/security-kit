@@ -215,6 +215,11 @@ sessions that don't use it. (Codex doesn't read the `disable-model-invocation` s
 
 Dynamic checks (`--base-url`) only ever target localhost or a host you confirm you own.
 
+**Reports stay out of git.** They list weaknesses that may not be fixed yet, so the first scan in a project writes
+`.securitykit/.gitignore` (everything in it except `ignore.json` and `manifest.json`, which you can commit) and adds
+`security-report*.md` to `.git/info/exclude`, which only affects your clone and leaves your `.gitignore` unchanged.
+If reports were already committed, the scan warns you. To share a report on purpose, use `git add -f`.
+
 ## Token use and prompt caching
 
 Your agent caches the conversation automatically: everything already in it (skill instructions, guides, scan
