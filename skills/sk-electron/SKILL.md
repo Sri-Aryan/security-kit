@@ -1,6 +1,7 @@
 ---
 name: sk-electron
 description: Audits Electron and Tauri desktop apps for nodeIntegration, contextIsolation and sandbox settings, exposed IPC and preload APIs, openExternal, navigation, auto-update and Tauri capabilities. Use when the project is an Electron or Tauri app, or types /sk-electron.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

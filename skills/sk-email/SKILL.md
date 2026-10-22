@@ -1,6 +1,7 @@
 ---
 name: sk-email
 description: Audits email, SMS and notification sending, covering header injection, user-controlled senders, HTML injection, Host-header poisoned links, spam relays, send limits and SMS pumping. Use when the project sends email or SMS and the user asks to audit it, or types /sk-email.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

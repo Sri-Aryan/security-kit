@@ -1,6 +1,7 @@
 ---
 name: sk-dos
 description: Audits application-level denial of service, covering body and page-size limits, input-sized loops, ReDoS, decompression and image bombs, missing timeouts and unbounded caches. Use when the user asks about DoS, resource exhaustion, ReDoS, zip bombs, timeouts or payload limits, or types /sk-dos.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
