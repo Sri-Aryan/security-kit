@@ -17,6 +17,8 @@ import re
 import sys
 from collections import Counter
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 
 SKIP_DIRS = {
@@ -176,7 +178,7 @@ def main(argv=None):
     }
     text = json.dumps(result, indent=2)
     if args.out:
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"{len(targets)} candidate targets ({result['summary']['with_fuzz_or_property_test']} with fuzz/property tests) -> {args.out}", file=sys.stderr)
