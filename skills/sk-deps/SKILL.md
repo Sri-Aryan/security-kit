@@ -1,12 +1,14 @@
 ---
 name: sk-deps
-description: Audits third-party dependencies in any ecosystem (npm/yarn/pnpm/bun, pip/Poetry/Pipenv/uv, Go, Ruby, PHP, Rust, Maven/Gradle, NuGet, Dart, Swift), covering known vulnerabilities via the project's own local scanners (npm audit, pip-audit, govulncheck, osv-scanner, trivy, ...), missing lockfiles, unpinned and dynamic versions, git/tarball/path sources, typosquats of popular packages, dependency confusion (extra indexes, unscoped registries), dependency install scripts, hijacked or sabotaged versions and unmaintained packages, update automation and SBOMs. Based on the OWASP Vulnerable Dependency Management, NPM Security and Supply Chain cheat sheets. Writes security-report-deps.md. Use when the user asks about vulnerable packages, dependency or supply-chain security, npm/pip audit, typosquatting, or types /sk-deps.
+description: Audits third-party dependencies in any ecosystem for known vulnerabilities (using local scanners), missing lockfiles, unpinned versions, typosquats, dependency confusion and install scripts. Use when the user asks about vulnerable packages, npm or pip audit, or supply-chain security, or types /sk-deps.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-deps: dependency and supply-chain audit
+
+**Scope.** Audits third-party dependencies in any ecosystem (npm/yarn/pnpm/bun, pip/Poetry/Pipenv/uv, Go, Ruby, PHP, Rust, Maven/Gradle, NuGet, Dart, Swift), covering known vulnerabilities via the project's own local scanners (npm audit, pip-audit, govulncheck, osv-scanner, trivy, ...), missing lockfiles, unpinned and dynamic versions, git/tarball/path sources, typosquats of popular packages, dependency confusion (extra indexes, unscoped registries), dependency install scripts, hijacked or sabotaged versions and unmaintained packages, update automation and SBOMs. Based on the OWASP Vulnerable Dependency Management, NPM Security and Supply Chain cheat sheets. Writes security-report-deps.md.
 
 Most of an application is other people's code. Two different risks: **known vulnerabilities** in honest packages, and
 **malicious packages** (typosquats, hijacked releases, dependency confusion, install scripts). A script reads every

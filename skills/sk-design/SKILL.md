@@ -1,12 +1,14 @@
 ---
 name: sk-design
-description: Runs a secure design review and threat model for a product or feature in any technology, covering context and security level, attack surface inventory and minimization, data-flow diagram with trust boundaries, STRIDE threats ranked with responses and owners, abuse cases, least privilege and separation of duties, defence in depth, zero trust, secure defaults and fail-secure behaviour, components, connections and segregation, data protection, central identity and authorization, configuration baseline, operations and incident response, secrets management, SDLC security and AI features. Based on the OWASP Secure Product Design, Threat Modeling, Attack Surface Analysis and Abuse Case cheat sheets. Produces threat-model.md and security-report-design.md. Use when the user asks for a threat model, security architecture or design review, attack surface analysis, "what could go wrong" before building a feature, or types /sk-design.
+description: Runs a secure design review and threat model with attack surface, data-flow diagram, trust boundaries and STRIDE threats, and writes threat-model.md. Use when the user asks for a threat model, design or architecture review, or what could go wrong before building a feature, or types /sk-design.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-design: secure design review and threat model
+
+**Scope.** Runs a secure design review and threat model for a product or feature in any technology, covering context and security level, attack surface inventory and minimization, data-flow diagram with trust boundaries, STRIDE threats ranked with responses and owners, abuse cases, least privilege and separation of duties, defence in depth, zero trust, secure defaults and fail-secure behaviour, components, connections and segregation, data protection, central identity and authorization, configuration baseline, operations and incident response, secrets management, SDLC security and AI features. Based on the OWASP Secure Product Design, Threat Modeling, Attack Surface Analysis and Abuse Case cheat sheets. Produces threat-model.md and security-report-design.md.
 
 Design flaws are missing or misplaced controls in how a system is put together, not bad lines of code. This
 skill answers the four threat-modeling questions for the project (or one feature): **What are we working on?

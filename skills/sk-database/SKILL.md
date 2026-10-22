@@ -1,12 +1,14 @@
 ---
 name: sk-database
-description: Audits database security in any language, ORM or data store, covering SQL injection from concatenated/formatted/interpolated queries, unsafe ORM raw APIs, dynamic ORDER BY, dynamic SQL in stored procedures, NoSQL operator injection and server-side JS, missing owner/tenant scoping, unbounded queries, bulk deletes without filters, race conditions on balances and stock, exposed database ports and admin UIs, missing TLS, unauthenticated stores, default passwords, credentials in code, superuser connections, dangerous features (xp_cmdshell, LOCAL INFILE), schema auto-sync, committed dumps and SQL logging. Based on the OWASP Database Security and SQL Injection Prevention cheat sheets. Writes security-report-database.md. Use when the user asks to audit database access, SQL/NoSQL injection, queries, ORM usage or database configuration, or types /sk-database.
+description: Audits database security, covering SQL and NoSQL injection, unsafe raw ORM queries, missing tenant scoping, exposed ports and admin UIs, TLS, superuser connections and committed dumps. Use when the user asks about database access, SQL injection, ORM usage or database config, or types /sk-database.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-database: database security audit
+
+**Scope.** Audits database security in any language, ORM or data store, covering SQL injection from concatenated/formatted/interpolated queries, unsafe ORM raw APIs, dynamic ORDER BY, dynamic SQL in stored procedures, NoSQL operator injection and server-side JS, missing owner/tenant scoping, unbounded queries, bulk deletes without filters, race conditions on balances and stock, exposed database ports and admin UIs, missing TLS, unauthenticated stores, default passwords, credentials in code, superuser connections, dangerous features (xp_cmdshell, LOCAL INFILE), schema auto-sync, committed dumps and SQL logging. Based on the OWASP Database Security and SQL Injection Prevention cheat sheets. Writes security-report-database.md.
 
 Database security has two halves in every stack. **The code's side**: are queries parameterised, are they
 scoped to the caller's rows, are results bounded, and can concurrent requests corrupt state? **The store's

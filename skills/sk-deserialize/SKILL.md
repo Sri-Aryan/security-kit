@@ -1,12 +1,14 @@
 ---
 name: sk-deserialize
-description: Finds unsafe deserialization and prototype pollution in any language, covering native object serializers (pickle, marshal, Java ObjectInputStream, .NET BinaryFormatter, PHP unserialize, Ruby Marshal, node-serialize), unsafe YAML loaders, polymorphic JSON typing (Jackson default typing, Json.NET TypeNameHandling, fastjson autoType), XMLDecoder/XStream, missing allow-lists and integrity checks, unsigned client-side serialized state (ViewState), pickle-based ML model loading (torch.load, joblib), prototype pollution via deep merge or dynamic keys, and gadget-chain libraries. Based on the OWASP Deserialization cheat sheet. Writes security-report-deserialize.md. Use when the user asks about deserialization, pickle, YAML load, RCE via serialized objects, prototype pollution, or types /sk-deserialize.
+description: Finds unsafe deserialization and prototype pollution, covering pickle, Java and .NET serializers, unsafe YAML loaders, polymorphic JSON, pickle-based model loading and deep merges. Use when the user asks about deserialization, pickle, YAML load or prototype pollution, or types /sk-deserialize.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-deserialize: deserialization audit
+
+**Scope.** Finds unsafe deserialization and prototype pollution in any language, covering native object serializers (pickle, marshal, Java ObjectInputStream, .NET BinaryFormatter, PHP unserialize, Ruby Marshal, node-serialize), unsafe YAML loaders, polymorphic JSON typing (Jackson default typing, Json.NET TypeNameHandling, fastjson autoType), XMLDecoder/XStream, missing allow-lists and integrity checks, unsigned client-side serialized state (ViewState), pickle-based ML model loading (torch.load, joblib), prototype pollution via deep merge or dynamic keys, and gadget-chain libraries. Based on the OWASP Deserialization cheat sheet. Writes security-report-deserialize.md.
 
 Native serializers rebuild object graphs, and code runs while they do. If an attacker controls the bytes, they usually
 control execution. For every deserialization point, answer two questions: **can untrusted data reach it** (requests,

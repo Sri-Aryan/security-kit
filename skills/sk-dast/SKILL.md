@@ -1,12 +1,14 @@
 ---
 name: sk-dast
-description: Runs a dynamic application security scan against a running instance the user owns (localhost or a dedicated test environment) using local tools such as OWASP ZAP (passive baseline via Docker, or an OpenAPI-driven API scan with explicit consent) or nuclei, then converts the alerts into confirmed findings grouped by category (injection, XSS, headers, cookies, information disclosure, exposed files and endpoints, TLS, authentication, CSRF, open redirects, CORS, SSRF), traces each to the code, and points to the static skill with the fix. Writes security-report-dast.md. Use when the user asks for a DAST, dynamic or black-box scan, a ZAP scan, or to test a running app, or types /sk-dast.
+description: Runs a dynamic scan (OWASP ZAP or nuclei) against a running app the user owns, then confirms the alerts and traces them to code. Use when the user asks for a DAST, dynamic, black-box or ZAP scan, or to test a running app, or types /sk-dast.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-dast: dynamic scan of a running app
+
+**Scope.** Runs a dynamic application security scan against a running instance the user owns (localhost or a dedicated test environment) using local tools such as OWASP ZAP (passive baseline via Docker, or an OpenAPI-driven API scan with explicit consent) or nuclei, then converts the alerts into confirmed findings grouped by category (injection, XSS, headers, cookies, information disclosure, exposed files and endpoints, TLS, authentication, CSRF, open redirects, CORS, SSRF), traces each to the code, and points to the static skill with the fix. Writes security-report-dast.md.
 
 Static review shows what the code could do; a dynamic scan shows what the running app actually does: missing headers,
 leaked versions, exposed files, injections that really fire. This skill picks a local scanner, runs it **only against
