@@ -1,12 +1,14 @@
 ---
 name: sk-docker
-description: Audits container security in Dockerfiles, Docker Compose files and Kubernetes manifests, covering exposed Docker daemon or socket, root users, privileged containers, dangerous capabilities, privilege escalation, host namespaces and host-path mounts, disabled seccomp/AppArmor, published ports, resource limits, read-only filesystems, unpinned or end-of-life base images, ADD and curl-pipe-shell, missing multi-stage builds and .dockerignore, baked-in secrets, Kubernetes RBAC and service-account tokens, and image scanning/signing. Based on the OWASP Docker Security cheat sheet. Writes security-report-docker.md. Use when the project has Dockerfiles, compose files or Kubernetes manifests and the user asks to audit or harden containers, or types /sk-docker.
+description: Audits Dockerfiles, Compose files and Kubernetes manifests for root and privileged containers, exposed Docker sockets, host mounts, unpinned images, baked-in secrets and RBAC. Use when the user asks to audit or harden containers or Kubernetes, or types /sk-docker.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-docker: container security audit
+
+**Scope.** Audits container security in Dockerfiles, Docker Compose files and Kubernetes manifests, covering exposed Docker daemon or socket, root users, privileged containers, dangerous capabilities, privilege escalation, host namespaces and host-path mounts, disabled seccomp/AppArmor, published ports, resource limits, read-only filesystems, unpinned or end-of-life base images, ADD and curl-pipe-shell, missing multi-stage builds and .dockerignore, baked-in secrets, Kubernetes RBAC and service-account tokens, and image scanning/signing. Based on the OWASP Docker Security cheat sheet. Writes security-report-docker.md.
 
 A container is a process with a restricted view of the host. Findings fall into three concepts that are the
 same for Docker, Podman, Compose and Kubernetes: **how much of the host the process can reach** (daemon,

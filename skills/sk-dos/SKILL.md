@@ -1,12 +1,14 @@
 ---
 name: sk-dos
-description: Audits application-level denial of service and resource exhaustion in any stack (OWASP API4), covering request body, field and depth limits, page sizes taken from the request without a maximum, loops, allocations and string repetition sized by input, slow password hashing on unbounded input, regexes with catastrophic backtracking (ReDoS), decompression and image bombs, missing timeouts on outbound HTTP and servers, unbounded in-memory maps and caches, expensive synchronous work (PDFs, exports, media, bulk email) and infinite retries. Based on the OWASP Denial of Service cheat sheet. Writes security-report-dos.md. Use when the user asks about DoS, resource exhaustion, ReDoS, zip bombs, timeouts, payload limits, or types /sk-dos.
+description: Audits application-level denial of service, covering body and page-size limits, input-sized loops, ReDoS, decompression and image bombs, missing timeouts and unbounded caches. Use when the user asks about DoS, resource exhaustion, ReDoS, zip bombs, timeouts or payload limits, or types /sk-dos.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-dos: denial-of-service and resource-exhaustion audit
+
+**Scope.** Audits application-level denial of service and resource exhaustion in any stack (OWASP API4), covering request body, field and depth limits, page sizes taken from the request without a maximum, loops, allocations and string repetition sized by input, slow password hashing on unbounded input, regexes with catastrophic backtracking (ReDoS), decompression and image bombs, missing timeouts on outbound HTTP and servers, unbounded in-memory maps and caches, expensive synchronous work (PDFs, exports, media, bulk email) and infinite retries. Based on the OWASP Denial of Service cheat sheet. Writes security-report-dos.md.
 
 Application DoS rarely needs a botnet: one huge body, `?limit=1000000`, a string that makes a regex backtrack for
 minutes, or a small zip that inflates to gigabytes is enough. This skill finds every place where work grows with

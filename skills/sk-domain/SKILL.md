@@ -1,12 +1,14 @@
 ---
 name: sk-domain
-description: Audits domain, DNS and email-authentication security as far as the repository defines it (Terraform/OpenTofu, Pulumi, CloudFormation, zone files, Cloudflare/Route 53/Azure/Google DNS) plus targeted questions, covering subdomain takeover through records pointing at deprovisioned third-party services (S3 websites, Heroku, Azure, GitHub Pages, CloudFront, Netlify, Vercel, helpdesk hosts), wildcard records, SPF (+all/?all), DMARC policy, DKIM key length, CAA records, certificate automation, security.txt, session cookies scoped to the parent domain, and registrar/DNS account protection. Writes security-report-domain.md. Use when the user asks about DNS, subdomain takeover, SPF/DKIM/DMARC, email spoofing, security.txt, or types /sk-domain.
+description: Audits domain, DNS and email authentication, covering subdomain takeover, wildcard records, SPF, DMARC, DKIM, CAA and security.txt. Use when the user asks about DNS, subdomain takeover, email spoofing or SPF/DKIM/DMARC, or types /sk-domain.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-domain: domain, DNS and email-authentication audit
+
+**Scope.** Audits domain, DNS and email-authentication security as far as the repository defines it (Terraform/OpenTofu, Pulumi, CloudFormation, zone files, Cloudflare/Route 53/Azure/Google DNS) plus targeted questions, covering subdomain takeover through records pointing at deprovisioned third-party services (S3 websites, Heroku, Azure, GitHub Pages, CloudFront, Netlify, Vercel, helpdesk hosts), wildcard records, SPF (+all/?all), DMARC policy, DKIM key length, CAA records, certificate automation, security.txt, session cookies scoped to the parent domain, and registrar/DNS account protection. Writes security-report-domain.md.
 
 The domain is the root of trust for links, cookies, emails and certificates. Dangling DNS records let others serve
 content on your subdomains; weak SPF/DMARC lets them send mail as you; parent-domain cookies let any subdomain read

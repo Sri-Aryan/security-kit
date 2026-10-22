@@ -1,12 +1,14 @@
 ---
 name: sk-electron
-description: Audits desktop apps built with Electron or Tauri, where an XSS can become code execution on the user's machine, covering nodeIntegration, contextIsolation, sandbox and webSecurity settings, preload scripts that expose ipcRenderer or Node APIs, IPC handlers that pass renderer input to exec or the filesystem without sender validation, remote content, navigation and new-window restrictions, webview tags, shell.openExternal with unvalidated URLs, custom protocol path traversal, missing CSP, insecure auto-update and code signing, Electron fuses, and broad Tauri capabilities and scopes. Based on the Electron security checklist and Tauri security guidance. Writes security-report-electron.md. Use when the project is an Electron or Tauri app and the user asks about desktop app security, or types /sk-electron.
+description: Audits Electron and Tauri desktop apps for nodeIntegration, contextIsolation and sandbox settings, exposed IPC and preload APIs, openExternal, navigation, auto-update and Tauri capabilities. Use when the project is an Electron or Tauri app, or types /sk-electron.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-electron: desktop app (Electron / Tauri) audit
+
+**Scope.** Audits desktop apps built with Electron or Tauri, where an XSS can become code execution on the user's machine, covering nodeIntegration, contextIsolation, sandbox and webSecurity settings, preload scripts that expose ipcRenderer or Node APIs, IPC handlers that pass renderer input to exec or the filesystem without sender validation, remote content, navigation and new-window restrictions, webview tags, shell.openExternal with unvalidated URLs, custom protocol path traversal, missing CSP, insecure auto-update and code signing, Electron fuses, and broad Tauri capabilities and scopes. Based on the Electron security checklist and Tauri security guidance. Writes security-report-electron.md.
 
 In a browser, XSS steals a session; in a desktop app it can run programs. This skill treats every renderer as a
 possibly compromised browser tab and checks the bridge to the operating system: window settings, preload APIs, IPC

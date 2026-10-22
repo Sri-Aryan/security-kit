@@ -1,12 +1,14 @@
 ---
 name: sk-email
-description: Audits email, SMS and notification sending in any stack and with any provider (SMTP, SES, SendGrid, Mailgun, Postmark, Resend, Twilio, SNS), covering header/CRLF injection, user-controlled sender, HTML injection and template injection in messages, links poisoned via the Host header, passwords in emails, account enumeration through "email sent" messages, spam relays via contact/invite/share features, sending rate limits, attachment path/URL abuse, SMTP TLS and credentials, and SMS pumping/toll fraud. Writes security-report-email.md. Use when the project sends emails or SMS/notifications and the user asks to audit them, or types /sk-email.
+description: Audits email, SMS and notification sending, covering header injection, user-controlled senders, HTML injection, Host-header poisoned links, spam relays, send limits and SMS pumping. Use when the project sends email or SMS and the user asks to audit it, or types /sk-email.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-email: email and notification audit
+
+**Scope.** Audits email, SMS and notification sending in any stack and with any provider (SMTP, SES, SendGrid, Mailgun, Postmark, Resend, Twilio, SNS), covering header/CRLF injection, user-controlled sender, HTML injection and template injection in messages, links poisoned via the Host header, passwords in emails, account enumeration through "email sent" messages, spam relays via contact/invite/share features, sending rate limits, attachment path/URL abuse, SMTP TLS and credentials, and SMS pumping/toll fraud. Writes security-report-email.md.
 
 Every message the application sends is an output sink. User data can reach the **recipients and headers**
 (injection, relay, spoofing), the **content** (HTML/template injection, secrets), the **links** (Host-header
