@@ -25,6 +25,8 @@ import sys
 import urllib.parse
 import urllib.request
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "trace")
 WRITE_METHODS = {"post", "put", "patch", "delete"}
@@ -776,7 +778,7 @@ def main(argv=None):
     }
     text = json.dumps(result, indent=2, default=str)
     if args.out:
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"{len(specs)} spec(s), {len(cands)} candidates -> {args.out}", file=sys.stderr)
