@@ -19,6 +19,8 @@ import os
 import re
 import sys
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 SEVERITIES = ["Critical", "High", "Medium", "Low"]
 WEIGHT = {"Critical": 25, "High": 10, "Medium": 4, "Low": 1}
@@ -237,7 +239,8 @@ def merge(root, include_review, out_json, out_md):
                                     "duplicatesMerged": total_in - len(findings)},
         "skills": per_skill, "findings": findings, "warnings": warnings,
     }
-    os.makedirs(os.path.dirname(os.path.abspath(out_json)), exist_ok=True)
+    prepare_output(out_json)
+    prepare_output(out_md)
     with open(out_json, "w", encoding="utf-8") as fh:
         json.dump(result, fh, indent=2)
         fh.write("\n")
@@ -318,7 +321,7 @@ def main(argv=None):
         result = plan(root, os.path.abspath(args.skills_dir), args.max_files)
         text = json.dumps(result, indent=2)
         if args.out:
-            os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+            prepare_output(args.out)
             with open(args.out, "w", encoding="utf-8") as fh:
                 fh.write(text + "\n")
             print(f"{len(result['run'])} skills to run -> {args.out}", file=sys.stderr)
