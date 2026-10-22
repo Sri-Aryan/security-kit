@@ -1,12 +1,14 @@
 ---
 name: sk-help
-description: Lists every SecurityKit command grouped by area (workflows, APIs, identity and access, injection and input, web and browser, data/privacy/crypto, business logic, AI and agents, apps and platforms, supply chain and infrastructure, design/testing/assurance) with a one-line description of each and whether it is installed. Use when the user asks what SecurityKit can do, which security commands or skills exist, where to start, or types /sk-help.
+description: Lists every SecurityKit command grouped by area, with a one-line description and whether it is installed. Use when the user asks what SecurityKit can do, which security skills exist or where to start, or types /sk-help.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # SecurityKit help
+
+**Scope.** Lists every SecurityKit command grouped by area (workflows, APIs, identity and access, injection and input, web and browser, data/privacy/crypto, business logic, AI and agents, apps and platforms, supply chain and infrastructure, design/testing/assurance) with a one-line description of each and whether it is installed.
 
 Show the user the grouped command list below. Do not run any scans from this skill.
 
@@ -27,6 +29,7 @@ Show the user the grouped command list below. Do not run any scans from this ski
 | `/sk-audit` | Run every relevant skill and produce one combined, deduplicated report and score | |
 | `/sk-review` | Fast security review of the current diff, branch or PR only | |
 | `/sk-fix` | Work through findings from any report, applying approved fixes with re-verification | |
+| `/sk-variant` | Variant analysis: turn one confirmed bug into a rule and find its siblings everywhere | |
 
 ### APIs
 
@@ -53,6 +56,8 @@ Show the user the grouped command list below. Do not run any scans from this ski
 | `/sk-tokens` | JWT verification, token randomness and storage, refresh rotation, API keys | |
 | `/sk-oauth2` | OAuth 2.0 / OIDC: PKCE, state, redirect URIs, ID tokens, audiences, scopes | |
 | `/sk-saml` | SAML SSO: signature checks and wrapping, audience, replay, certificates, RelayState | |
+| `/sk-authprovider` | Clerk, Auth0, NextAuth, Better Auth, Supabase/Firebase Auth: trust, roles, webhooks | |
+| `/sk-passkeys` | Passkeys/WebAuthn, magic links and one-time codes: challenges, origins, tokens | |
 | `/sk-authz` | Access-control design: default deny, roles, tenant isolation, IDOR, escalation | |
 
 ### Injection & untrusted input
@@ -79,6 +84,8 @@ Show the user the grouped command list below. Do not run any scans from this ski
 | `/sk-csrf` | CSRF: disabled protection, state-changing GETs, SameSite, CORS with credentials | |
 | `/sk-cache` | Caching: personal data cached publicly, cache poisoning and deception, shared keys | |
 | `/sk-config` | Misconfiguration: debug modes, stack traces, open actuators, fallback secrets | |
+| `/sk-nextjs` | Next.js, SvelteKit, Nuxt, Remix: Server Actions, middleware, RSC leaks, public env | |
+| `/sk-defaults` | Insecure defaults and fail-open: missing config, catch-allow, default-allow, nulls | |
 
 ### Data, privacy & crypto
 
@@ -90,6 +97,7 @@ Show the user the grouped command list below. Do not run any scans from this ski
 | `/sk-privacy` | Personal data: minimization, exposure, third parties, consent, deletion, retention | |
 | `/sk-crypto` | Cryptography: algorithms, modes, IVs, keys and KDFs, randomness, TLS verification | |
 | `/sk-logging` | Security logging: events, audit trails, secrets in logs, alerting, retention | |
+| `/sk-baas` | Supabase/Firebase and other BaaS: RLS and rules, service keys, storage, functions | |
 
 ### Business logic & abuse
 
@@ -104,10 +112,11 @@ Show the user the grouped command list below. Do not run any scans from this ski
 | `/sk-dos` | Resource exhaustion: body/page limits, ReDoS, zip bombs, timeouts, unbounded work | |
 | `/sk-email` | Email and SMS: header injection, poisoned links, spam relays, SMS pumping | |
 | `/sk-queue` | Queues and jobs: broker auth, unsafe serializers, worker authz, dashboards, DLQs | |
+| `/sk-abuse` | Abuse and fraud: bot sign-ups, CAPTCHA, trial and credit farming, free-tier costs | |
 
 ### AI & agents
 
-*LLM features, prompt injection, tool-using agents, MCP servers and retrieval.*
+*LLM features, prompt injection, tool-using agents, MCP servers, retrieval and AI-written code.*
 
 | Command | What it does | Status |
 |---|---|---|
@@ -115,6 +124,7 @@ Show the user the grouped command list below. Do not run any scans from this ski
 | `/sk-prompt-injection` | Prompt injection: untrusted channels, system prompts, tool approvals, outputs | |
 | `/sk-agents` | Agents and MCP: tool permissions, inputs, sandboxes, human approval, server trust | |
 | `/sk-rag` | RAG pipelines: poisoning, per-chunk access control, tenant isolation, vector stores | |
+| `/sk-ai-code` | AI-written code: placeholder auth, disabled checks, mass assignment, phantom packages | |
 
 ### Apps & platforms
 
@@ -125,6 +135,7 @@ Show the user the grouped command list below. Do not run any scans from this ski
 | `/sk-mobile` | Android/iOS (MASVS): storage, cleartext, TLS, exported components, WebViews | |
 | `/sk-electron` | Electron/Tauri: node integration, isolation, preload and IPC, openExternal, updates | |
 | `/sk-extension` | Browser extensions: permissions, remote code, message senders, content scripts | |
+| `/sk-game` | Games: server authority, leaderboards, economy, IAP and ad rewards, RPCs, client keys | |
 
 ### Supply chain & infrastructure
 
@@ -136,6 +147,7 @@ Show the user the grouped command list below. Do not run any scans from this ski
 | `/sk-deps` | Dependencies: vulnerabilities, lockfiles, typosquats, confusion, install scripts | |
 | `/sk-docker` | Dockerfiles, Compose and Kubernetes: root, privileges, mounts, images, secrets | |
 | `/sk-cloud` | Cloud IaC: public buckets, wildcard IAM, open ports, encryption, IMDSv2, state | |
+| `/sk-paas` | Hosting platforms (Vercel, Netlify, Cloudflare, Render, Fly): secrets, previews, crons | |
 | `/sk-cicd` | CI/CD pipelines: triggers, script injection, token permissions, pinning, runners | |
 | `/sk-repo` | Repository hygiene: policy, CODEOWNERS, branch protection, tracked secrets, scans | |
 | `/sk-domain` | Domains and DNS: subdomain takeover, SPF/DKIM/DMARC, CAA, security.txt | |

@@ -60,6 +60,7 @@ In your agent, inside the project:
 | `/sk-audit` | Run every relevant skill and produce one combined, deduplicated report and score |
 | `/sk-review` | Fast security review of the current diff, branch or PR only |
 | `/sk-fix` | Work through findings from any report, applying approved fixes with re-verification |
+| `/sk-variant` | Variant analysis: turn one confirmed bug into a rule and find its siblings everywhere |
 
 ### APIs
 
@@ -86,6 +87,8 @@ In your agent, inside the project:
 | `/sk-tokens` | JWT verification, token randomness and storage, refresh rotation, API keys |
 | `/sk-oauth2` | OAuth 2.0 / OIDC: PKCE, state, redirect URIs, ID tokens, audiences, scopes |
 | `/sk-saml` | SAML SSO: signature checks and wrapping, audience, replay, certificates, RelayState |
+| `/sk-authprovider` | Clerk, Auth0, NextAuth, Better Auth, Supabase/Firebase Auth: trust, roles, webhooks |
+| `/sk-passkeys` | Passkeys/WebAuthn, magic links and one-time codes: challenges, origins, tokens |
 | `/sk-authz` | Access-control design: default deny, roles, tenant isolation, IDOR, escalation |
 
 ### Injection & untrusted input
@@ -112,6 +115,8 @@ In your agent, inside the project:
 | `/sk-csrf` | CSRF: disabled protection, state-changing GETs, SameSite, CORS with credentials |
 | `/sk-cache` | Caching: personal data cached publicly, cache poisoning and deception, shared keys |
 | `/sk-config` | Misconfiguration: debug modes, stack traces, open actuators, fallback secrets |
+| `/sk-nextjs` | Next.js, SvelteKit, Nuxt, Remix: Server Actions, middleware, RSC leaks, public env |
+| `/sk-defaults` | Insecure defaults and fail-open: missing config, catch-allow, default-allow, nulls |
 
 ### Data, privacy & crypto
 
@@ -123,6 +128,7 @@ In your agent, inside the project:
 | `/sk-privacy` | Personal data: minimization, exposure, third parties, consent, deletion, retention |
 | `/sk-crypto` | Cryptography: algorithms, modes, IVs, keys and KDFs, randomness, TLS verification |
 | `/sk-logging` | Security logging: events, audit trails, secrets in logs, alerting, retention |
+| `/sk-baas` | Supabase/Firebase and other BaaS: RLS and rules, service keys, storage, functions |
 
 ### Business logic & abuse
 
@@ -137,10 +143,11 @@ In your agent, inside the project:
 | `/sk-dos` | Resource exhaustion: body/page limits, ReDoS, zip bombs, timeouts, unbounded work |
 | `/sk-email` | Email and SMS: header injection, poisoned links, spam relays, SMS pumping |
 | `/sk-queue` | Queues and jobs: broker auth, unsafe serializers, worker authz, dashboards, DLQs |
+| `/sk-abuse` | Abuse and fraud: bot sign-ups, CAPTCHA, trial and credit farming, free-tier costs |
 
 ### AI & agents
 
-*LLM features, prompt injection, tool-using agents, MCP servers and retrieval.*
+*LLM features, prompt injection, tool-using agents, MCP servers, retrieval and AI-written code.*
 
 | Command | What it does |
 |---|---|
@@ -148,6 +155,7 @@ In your agent, inside the project:
 | `/sk-prompt-injection` | Prompt injection: untrusted channels, system prompts, tool approvals, outputs |
 | `/sk-agents` | Agents and MCP: tool permissions, inputs, sandboxes, human approval, server trust |
 | `/sk-rag` | RAG pipelines: poisoning, per-chunk access control, tenant isolation, vector stores |
+| `/sk-ai-code` | AI-written code: placeholder auth, disabled checks, mass assignment, phantom packages |
 
 ### Apps & platforms
 
@@ -158,6 +166,7 @@ In your agent, inside the project:
 | `/sk-mobile` | Android/iOS (MASVS): storage, cleartext, TLS, exported components, WebViews |
 | `/sk-electron` | Electron/Tauri: node integration, isolation, preload and IPC, openExternal, updates |
 | `/sk-extension` | Browser extensions: permissions, remote code, message senders, content scripts |
+| `/sk-game` | Games: server authority, leaderboards, economy, IAP and ad rewards, RPCs, client keys |
 
 ### Supply chain & infrastructure
 
@@ -169,6 +178,7 @@ In your agent, inside the project:
 | `/sk-deps` | Dependencies: vulnerabilities, lockfiles, typosquats, confusion, install scripts |
 | `/sk-docker` | Dockerfiles, Compose and Kubernetes: root, privileges, mounts, images, secrets |
 | `/sk-cloud` | Cloud IaC: public buckets, wildcard IAM, open ports, encryption, IMDSv2, state |
+| `/sk-paas` | Hosting platforms (Vercel, Netlify, Cloudflare, Render, Fly): secrets, previews, crons |
 | `/sk-cicd` | CI/CD pipelines: triggers, script injection, token permissions, pinning, runners |
 | `/sk-repo` | Repository hygiene: policy, CODEOWNERS, branch protection, tracked secrets, scans |
 | `/sk-domain` | Domains and DNS: subdomain takeover, SPF/DKIM/DMARC, CAA, security.txt |
@@ -198,6 +208,20 @@ In your agent, inside the project:
 5. **Optional**: `--tests` writes regression tests; `--fix` proposes fixes and applies only the ones you approve.
 
 Dynamic checks (`--base-url`) only ever target localhost or a host you confirm you own.
+
+## Token use and prompt caching
+
+Your agent caches the conversation automatically: everything already in it (skill instructions, guides, scan
+results) is re-billed at a tenth of the normal input price or less on later turns, as long as the start of the
+conversation stays the same. SecurityKit is written to keep it that way: skill descriptions are short and fixed,
+scanner output is byte-for-byte stable between runs, and skills read each file once. You can help:
+
+- **Run related skills in one session.** `/sk-audit` then `/sk-fix` in the same conversation reuses everything
+  already read; a new session starts cold.
+- **Pick the model before a long run.** Switching models (or turning tools on and off) mid-audit discards the cache.
+- **Don't update or edit installed skills mid-session.** The skill list is part of every request's prefix.
+- **Answer questions promptly during interactive skills.** An idle cache expires (after five minutes by default;
+  some plans keep it for an hour), and the next turn pays full price for the whole conversation again.
 
 ## Terminal commands
 

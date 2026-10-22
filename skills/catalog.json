@@ -9,7 +9,8 @@
         { "name": "sk-help", "summary": "List every SecurityKit command, grouped, with a one-line description" },
         { "name": "sk-audit", "summary": "Run every relevant skill and produce one combined, deduplicated report and score" },
         { "name": "sk-review", "summary": "Fast security review of the current diff, branch or PR only" },
-        { "name": "sk-fix", "summary": "Work through findings from any report, applying approved fixes with re-verification" }
+        { "name": "sk-fix", "summary": "Work through findings from any report, applying approved fixes with re-verification" },
+        { "name": "sk-variant", "summary": "Variant analysis: turn one confirmed bug into a rule and find its siblings everywhere" }
       ]
     },
     {
@@ -36,6 +37,8 @@
         { "name": "sk-tokens", "summary": "JWT verification, token randomness and storage, refresh rotation, API keys" },
         { "name": "sk-oauth2", "summary": "OAuth 2.0 / OIDC: PKCE, state, redirect URIs, ID tokens, audiences, scopes" },
         { "name": "sk-saml", "summary": "SAML SSO: signature checks and wrapping, audience, replay, certificates, RelayState" },
+        { "name": "sk-authprovider", "summary": "Clerk, Auth0, NextAuth, Better Auth, Supabase/Firebase Auth: trust, roles, webhooks" },
+        { "name": "sk-passkeys", "summary": "Passkeys/WebAuthn, magic links and one-time codes: challenges, origins, tokens" },
         { "name": "sk-authz", "summary": "Access-control design: default deny, roles, tenant isolation, IDOR, escalation" }
       ]
     },
@@ -61,7 +64,9 @@
         { "name": "sk-browser", "summary": "Security headers, clickjacking, cookie flags, tokens in storage, bundle secrets, SRI" },
         { "name": "sk-csrf", "summary": "CSRF: disabled protection, state-changing GETs, SameSite, CORS with credentials" },
         { "name": "sk-cache", "summary": "Caching: personal data cached publicly, cache poisoning and deception, shared keys" },
-        { "name": "sk-config", "summary": "Misconfiguration: debug modes, stack traces, open actuators, fallback secrets" }
+        { "name": "sk-config", "summary": "Misconfiguration: debug modes, stack traces, open actuators, fallback secrets" },
+        { "name": "sk-nextjs", "summary": "Next.js, SvelteKit, Nuxt, Remix: Server Actions, middleware, RSC leaks, public env" },
+        { "name": "sk-defaults", "summary": "Insecure defaults and fail-open: missing config, catch-allow, default-allow, nulls" }
       ]
     },
     {
@@ -72,7 +77,8 @@
         { "name": "sk-database", "summary": "Raw queries, row scoping, DB exposure, TLS, privileges and hardening" },
         { "name": "sk-privacy", "summary": "Personal data: minimization, exposure, third parties, consent, deletion, retention" },
         { "name": "sk-crypto", "summary": "Cryptography: algorithms, modes, IVs, keys and KDFs, randomness, TLS verification" },
-        { "name": "sk-logging", "summary": "Security logging: events, audit trails, secrets in logs, alerting, retention" }
+        { "name": "sk-logging", "summary": "Security logging: events, audit trails, secrets in logs, alerting, retention" },
+        { "name": "sk-baas", "summary": "Supabase/Firebase and other BaaS: RLS and rules, service keys, storage, functions" }
       ]
     },
     {
@@ -86,18 +92,20 @@
         { "name": "sk-ratelimit", "summary": "Rate limits and quotas: login, OTP, expensive endpoints, IP spoofing, bypasses" },
         { "name": "sk-dos", "summary": "Resource exhaustion: body/page limits, ReDoS, zip bombs, timeouts, unbounded work" },
         { "name": "sk-email", "summary": "Email and SMS: header injection, poisoned links, spam relays, SMS pumping" },
-        { "name": "sk-queue", "summary": "Queues and jobs: broker auth, unsafe serializers, worker authz, dashboards, DLQs" }
+        { "name": "sk-queue", "summary": "Queues and jobs: broker auth, unsafe serializers, worker authz, dashboards, DLQs" },
+        { "name": "sk-abuse", "summary": "Abuse and fraud: bot sign-ups, CAPTCHA, trial and credit farming, free-tier costs" }
       ]
     },
     {
       "id": "ai",
       "title": "AI & agents",
-      "blurb": "LLM features, prompt injection, tool-using agents, MCP servers and retrieval.",
+      "blurb": "LLM features, prompt injection, tool-using agents, MCP servers, retrieval and AI-written code.",
       "skills": [
         { "name": "sk-ai", "summary": "LLM features vs OWASP LLM Top 10: unsafe output, leaks, PII, cost abuse, keys" },
         { "name": "sk-prompt-injection", "summary": "Prompt injection: untrusted channels, system prompts, tool approvals, outputs" },
         { "name": "sk-agents", "summary": "Agents and MCP: tool permissions, inputs, sandboxes, human approval, server trust" },
-        { "name": "sk-rag", "summary": "RAG pipelines: poisoning, per-chunk access control, tenant isolation, vector stores" }
+        { "name": "sk-rag", "summary": "RAG pipelines: poisoning, per-chunk access control, tenant isolation, vector stores" },
+        { "name": "sk-ai-code", "summary": "AI-written code: placeholder auth, disabled checks, mass assignment, phantom packages" }
       ]
     },
     {
@@ -107,7 +115,8 @@
       "skills": [
         { "name": "sk-mobile", "summary": "Android/iOS (MASVS): storage, cleartext, TLS, exported components, WebViews" },
         { "name": "sk-electron", "summary": "Electron/Tauri: node integration, isolation, preload and IPC, openExternal, updates" },
-        { "name": "sk-extension", "summary": "Browser extensions: permissions, remote code, message senders, content scripts" }
+        { "name": "sk-extension", "summary": "Browser extensions: permissions, remote code, message senders, content scripts" },
+        { "name": "sk-game", "summary": "Games: server authority, leaderboards, economy, IAP and ad rewards, RPCs, client keys" }
       ]
     },
     {
@@ -119,6 +128,7 @@
         { "name": "sk-deps", "summary": "Dependencies: vulnerabilities, lockfiles, typosquats, confusion, install scripts" },
         { "name": "sk-docker", "summary": "Dockerfiles, Compose and Kubernetes: root, privileges, mounts, images, secrets" },
         { "name": "sk-cloud", "summary": "Cloud IaC: public buckets, wildcard IAM, open ports, encryption, IMDSv2, state" },
+        { "name": "sk-paas", "summary": "Hosting platforms (Vercel, Netlify, Cloudflare, Render, Fly): secrets, previews, crons" },
         { "name": "sk-cicd", "summary": "CI/CD pipelines: triggers, script injection, token permissions, pinning, runners" },
         { "name": "sk-repo", "summary": "Repository hygiene: policy, CODEOWNERS, branch protection, tracked secrets, scans" },
         { "name": "sk-domain", "summary": "Domains and DNS: subdomain takeover, SPF/DKIM/DMARC, CAA, security.txt" }
