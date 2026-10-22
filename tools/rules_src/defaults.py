@@ -1,0 +1,185 @@
+"""sk-defaults rules: insecure defaults and fail-open behaviour.
+
+Missing configuration that disables a check, secret fallbacks, catch blocks that allow, security switches that default
+to off, "dev mode" detection that defaults to dev, default-allow branches, undefined === undefined comparisons,
+library defaults, world-writable permissions and default credentials.
+"""
+
+SKILL = "sk-defaults"
+
+MACROS = {
+    "SEC_WORD": r"(?i:auth|verif|signature|sig\b|token|permission|authoriz|csrf|captcha|webhook|hmac|jwt|session|access|policy|acl|rbac)",
+    "ALLOW_RETURN": r"return\s+(next\(\)|true|True|NextResponse\.next\(\)|handler\(|await\s+handler\(|await\s+call_next\(|func\(|f\(|view\(|\{\s*valid\s*:\s*true|\{\s*ok\s*:\s*true|nil\b)|^\s*next\(\)\s*;?\s*$|^\s*pass\s*$|resolve\(\s*true\s*\)",
+}
+
+RULES = [
+    # ------------------------------------------------------------------ MISSING CONFIG FAILS OPEN
+    {
+        "id": "default-missing-secret-skips-check", "check_id": "DEFAULT-ENV-001", "title": "Check skipped when a secret/key is not configured", "files": ["js", "py", "go", "rb", "php"],
+        "pattern": r"(?i)^\s*if\s*\(?\s*(!\s*|not\s+|\w+\s*==\s*['\"]['\"]\s*|len\(\s*)[\w.\[\]'\"()]*(secret|key|token|signing|webhook|api_?key|password|hmac|jwks|public_?key)\w*['\"\])]*\s*\)?\s*(==\s*0\s*)?\)?\s*[{:]?\s*$|^\s*if\s*\(\s*!\s*[\w.]*(secret|key|token|signing|webhook|hmac)\w*\s*\)\s*(return\s+next\(\)|return\s+true|next\(\))",
+        "near": {"pattern": "{{ALLOW_RETURN}}|(?i:console\\.warn\\([^)]*(skip|disabl)|logger\\.warn\\w*\\([^)]*(skip|disabl)|log\\.Print\\w*\\([^)]*(skip|disabl))", "lines": 2},
+        "confidence": "MEDIUM", "note": "An unset variable (typo, new environment, rotated secret) silently turns the protection off. Throw at start-up when security config is missing.",
+        "examples": {"match": ["if (!process.env.WEBHOOK_SECRET) {\n  return next();\n}", "if not settings.SIGNING_KEY:\n    return True"],
+                     "no_match": ["if (!process.env.WEBHOOK_SECRET) {\n  throw new Error('WEBHOOK_SECRET is required');\n}"]},
+    },
+    {
+        "id": "default-secret-fallback", "check_id": "DEFAULT-FALLBACK-001", "title": "Secret falls back to a value in the source", "files": ["code"],
+        "pattern": r"process\.env\.{{SECRET_NAME}}\s*(\|\||\?\?)\s*['\"`][^'\"`\s]{2,}['\"`]|os\.(environ\.get|getenv)\(\s*['\"]{{SECRET_NAME}}['\"]\s*,\s*['\"][^'\"]{2,}['\"]\s*\)|os\.environ\.get\(\s*['\"]{{SECRET_NAME}}['\"]\s*\)\s*or\s*['\"][^'\"]{2,}['\"]|ENV\.fetch\(\s*['\"]{{SECRET_NAME}}['\"]\s*,\s*['\"][^'\"]{2,}['\"]|getenv\(\s*['\"]{{SECRET_NAME}}['\"]\s*\)\s*\?:\s*['\"][^'\"]{2,}['\"]|env\(\s*['\"]{{SECRET_NAME}}['\"]\s*,\s*['\"][^'\"]{2,}['\"]\s*\)",
+        "confidence": "HIGH",
+        "examples": {"match": ["const secret = process.env.SESSION_SECRET ?? 'dev-secret';", "'key' => env('APP_SECRET', 'base64:abc123'),"],
+                     "no_match": ["const secret = requiredEnv('SESSION_SECRET');", "const port = process.env.PORT || '3000';"]},
+    },
+    {
+        "id": "default-origin-fallback-star", "check_id": "DEFAULT-FALLBACK-001", "title": "Allowed origins/hosts default to '*'", "files": ["code"],
+        "pattern": r"(?i)(allowed_?origins?|cors_?origins?|ALLOWED_HOSTS|trusted_?origins|origin)\w*\s*[:=]\s*(process\.env\.\w+|os\.environ\.get\([^)]*\)|os\.getenv\([^)]*\)|env\([^)]*\))\s*(\|\||\?\?|\bor\b)\s*\[?\s*['\"]\*['\"]|os\.(environ\.get|getenv)\(\s*['\"](ALLOWED_HOSTS|CORS_ORIGINS?|ALLOWED_ORIGINS)['\"]\s*,\s*['\"]\*['\"]",
+        "confidence": "HIGH",
+        "examples": {"match": ["const origin = process.env.CORS_ORIGIN || '*';", "ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')"],
+                     "no_match": ["const origin = process.env.CORS_ORIGIN.split(',');"]},
+    },
+    # ------------------------------------------------------------------ ERRORS FAIL OPEN
+    {
+        "id": "default-catch-allows", "check_id": "DEFAULT-CATCH-001", "title": "Error during a security check results in access being allowed", "files": ["js", "java", "cs", "kt", "php"],
+        "multiline": True,
+        "pattern": r"catch\s*(\([^)]*\))?\s*\{\s*(?://[^\n]*\n\s*)*(?:console\.\w+\([^)]*\);?\s*|log\w*\.\w+\([^)]*\);?\s*)?(return\s+(true|next\(\)|NextResponse\.next\(\)|\{\s*valid\s*:\s*true|\{\s*ok\s*:\s*true)|next\(\)|resolve\(\s*true\s*\))",
+        "near": {"pattern": "{{SEC_WORD}}", "lines": 10}, "confidence": "HIGH",
+        "note": "Expired keys, network errors to the JWKS endpoint or malformed input then grant access. Deny on any error.",
+        "examples": {"match": ["try {\n  jwt.verify(token, key);\n} catch (e) {\n  console.warn(e);\n  return next();\n}"],
+                     "no_match": ["try {\n  jwt.verify(token, key);\n} catch (e) {\n  return res.status(401).end();\n}"]},
+    },
+    {
+        "id": "default-except-pass", "check_id": "DEFAULT-CATCH-001", "title": "Exception in a security check swallowed (except: pass / return True)", "files": ["py"],
+        "multiline": True,
+        "pattern": r"except[^\n:]*:\s*\n\s*(?:#[^\n]*\n\s*)*(?:log\w*\.\w+\([^)]*\)\s*\n\s*)?(pass|return\s+True|return\s+await\s+call_next|return\s+view|return\s+func)\b",
+        "near": {"pattern": "{{SEC_WORD}}", "lines": 8}, "confidence": "HIGH",
+        "examples": {"match": ["try:\n    verify_signature(payload, sig)\nexcept Exception:\n    pass"],
+                     "no_match": ["try:\n    verify_signature(payload, sig)\nexcept InvalidSignature:\n    abort(401)"]},
+    },
+    {
+        "id": "default-go-err-allows", "check_id": "DEFAULT-CATCH-001", "title": "Go error path in a security check continues the request", "files": ["go"],
+        "multiline": True,
+        "pattern": r"if\s+err\s*!=\s*nil\s*\{\s*(?:log\.\w+\([^)]*\)\s*)?(next\.ServeHTTP\(|return\s+true\b|c\.Next\(\))",
+        "near": {"pattern": "{{SEC_WORD}}", "lines": 8}, "confidence": "HIGH",
+        "examples": {"match": ["claims, err := verifyToken(r)\nif err != nil {\n\tlog.Println(err)\n\tnext.ServeHTTP(w, r)\n\treturn\n}"],
+                     "no_match": ["claims, err := verifyToken(r)\nif err != nil {\n\thttp.Error(w, \"unauthorized\", 401)\n\treturn\n}"]},
+    },
+    # ------------------------------------------------------------------ SECURITY SWITCHES
+    {
+        "id": "default-opt-in-security-flag", "check_id": "DEFAULT-FLAG-001", "title": "Security control enabled only when a flag is explicitly 'true'", "files": ["code"],
+        "pattern": r"(?i)\b(VERIFY|VALIDATE|ENFORCE|REQUIRE|ENABLE|CHECK)_?\w*(AUTH|SIGNATURE|SIG|CSRF|TLS|SSL|HTTPS|RATE_?LIMIT|CAPTCHA|MFA|2FA|SECURITY|PERMISSIONS?|RLS)\w*['\"]?\s*\]?\)?\s*(===?\s*['\"](true|1)['\"]|(\|\||\?\?)\s*false\b|,\s*(False|['\"]false['\"]|false|['\"]0['\"])\s*\))",
+        "confidence": "MEDIUM", "note": "Unset means insecure. Make the secure behaviour the default and require an explicit opt-out (and refuse the opt-out in production).",
+        "examples": {"match": ["const verifySignatures = process.env.VERIFY_SIGNATURES === 'true';", "ENFORCE_CSRF = os.getenv('ENFORCE_CSRF', 'false') == 'true'"],
+                     "no_match": ["const verifySignatures = process.env.VERIFY_SIGNATURES !== 'false';"]},
+    },
+    {
+        "id": "default-disable-switch-from-env", "check_id": "DEFAULT-FLAG-001", "title": "Environment switch that turns a security control off", "files": ["code", "env", "config"],
+        "pattern": r"(?i)\b(DISABLE|SKIP|BYPASS|NO|IGNORE|INSECURE)_?\w*(AUTH|SIGNATURE|CSRF|TLS|SSL|VERIFY|VERIFICATION|RATE_?LIMIT|CAPTCHA|SECURITY|PERMISSIONS?|CHECKS?|RLS|CORS)\b[^\n]*(process\.env|os\.environ|getenv|ENV\[|=\s*(true|1|yes))|(process\.env|os\.environ|getenv\(|ENV\[)[^\n]*\b(DISABLE|SKIP|BYPASS|NO|IGNORE|INSECURE)_?\w*(AUTH|SIGNATURE|CSRF|TLS|SSL|VERIFY|RATE_?LIMIT|CAPTCHA|SECURITY|PERMISSIONS?|CHECKS?)\b",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["if (process.env.SKIP_SIGNATURE_CHECK) return handle(req);", "DISABLE_RATE_LIMIT=true"], "no_match": ["const limit = Number(process.env.RATE_LIMIT_PER_MIN);"]},
+    },
+    {
+        "id": "default-insecure-param-default", "check_id": "DEFAULT-FLAG-001", "title": "Function parameter defaults to skipping a check", "files": ["code"],
+        "pattern": r"(?i)(function\s+\w*|def\s+\w+|=>)\s*\([^)\n]*\b(verify|verify_?signature|check_?auth|require_?auth|validate|secure|strict|check_?permissions?|authorize)\s*=\s*(false|False)\b|(function\s+\w*|def\s+\w+)\s*\([^)\n]*\b(skip_?auth|skipAuth|insecure|allow_?all|allowAll|bypass\w*)\s*=\s*(true|True)\b",
+        "confidence": "LOW",
+        "examples": {"match": ["function fetchUser(id, { verify = false } = {}) {}", "def load_token(raw, verify_signature=False):"],
+                     "no_match": ["def load_token(raw, verify_signature=True):"]},
+    },
+    # ------------------------------------------------------------------ ENVIRONMENT DETECTION
+    {
+        "id": "default-env-defaults-to-dev", "check_id": "DEFAULT-ENVCHECK-001", "title": "Environment defaults to development when unset", "files": ["code", "config"],
+        "pattern": r"(?i)(NODE_ENV|APP_ENV|ENV|ENVIRONMENT|FLASK_ENV|RAILS_ENV|RACK_ENV|APP_ENVIRONMENT|STAGE)['\"]?\s*\]?\)?\s*(\|\||\?\?|\bor\b)\s*['\"](dev|development|local|debug)['\"]|os\.(environ\.get|getenv)\(\s*['\"](ENV|APP_ENV|ENVIRONMENT|FLASK_ENV|STAGE)['\"]\s*,\s*['\"](dev|development|local|debug)['\"]|isDev\w*\s*=\s*!\s*process\.env\.NODE_ENV|isProd\w*\s*=\s*process\.env\.NODE_ENV\s*===\s*['\"]prod['\"]",
+        "confidence": "MEDIUM", "note": "Any environment where the variable is missing (a new host, a worker, a cron container) runs in dev mode. Default to production.",
+        "examples": {"match": ["const env = process.env.NODE_ENV || 'development';", "ENV = os.environ.get('APP_ENV', 'dev')"],
+                     "no_match": ["const env = process.env.NODE_ENV ?? 'production';"]},
+    },
+    {
+        "id": "default-debug-defaults-true", "check_id": "DEFAULT-ENVCHECK-001", "title": "DEBUG defaults to true", "files": ["code", "config"],
+        "pattern": r"(?i)\bDEBUG\s*=\s*(os\.environ\.get|os\.getenv|env\.bool|env|config|getenv)\(\s*['\"]\w*DEBUG['\"]\s*,\s*(default\s*=\s*)?(True|['\"](true|1|True|yes)['\"])|\bDEBUG\s*=\s*os\.environ\.get\(\s*['\"]\w*DEBUG['\"]\s*\)\s*!=\s*['\"](false|0|False)['\"]|['\"]debug['\"]\s*=>\s*env\(\s*['\"]APP_DEBUG['\"]\s*,\s*true\s*\)",
+        "confidence": "HIGH",
+        "examples": {"match": ["DEBUG = env.bool('DJANGO_DEBUG', default=True)", "'debug' => env('APP_DEBUG', true),"], "no_match": ["DEBUG = env.bool('DJANGO_DEBUG', default=False)"]},
+    },
+    {
+        "id": "default-control-skipped-in-dev", "check_id": "DEFAULT-ENVCHECK-001", "title": "Security control skipped based on an environment check", "files": ["code"],
+        "pattern": r"(?i)(NODE_ENV\s*!==?\s*['\"]production['\"]|NODE_ENV\s*===?\s*['\"](development|dev|test)['\"]|\bisDev\w*\b|\bIS_DEV\b|__DEV__|import\.meta\.env\.DEV|settings\.DEBUG|app\.debug|Rails\.env\.(development|test)\?|APP_ENV\s*!==?\s*['\"]prod)[^\n]*(auth|csrf|verif|signature|rate.?limit|captcha|permission|admin|bypass|skip|next\(\)|return\s+true)",
+        "confidence": "MEDIUM", "note": "Confirm the check reads a variable that is always set in production; prefer explicit, separately configured test doubles over environment sniffing.",
+        "examples": {"match": ["if (process.env.NODE_ENV !== 'production') return next(); // skip auth locally"], "no_match": ["if (process.env.NODE_ENV !== 'production') logger.level = 'debug';"]},
+    },
+    # ------------------------------------------------------------------ DEFAULT ALLOW
+    {
+        "id": "default-switch-allows", "check_id": "DEFAULT-ALLOW-001", "title": "Unknown role/action falls through to allow", "files": ["code"],
+        "multiline": True,
+        "pattern": r"default\s*:\s*(?://[^\n]*\n\s*)*(return\s+(true|['\"]allow['\"]|Allow|ALLOW|Decision\.ALLOW)|allowed\s*=\s*true)",
+        "near": {"pattern": r"(?i)role|permission|action|policy|\bcan\w*\(|ability|authoriz|scope", "lines": 20}, "confidence": "MEDIUM",
+        "examples": {"match": ["switch (role) {\n  case 'banned': return false;\n  default: return true;\n}"],
+                     "no_match": ["switch (role) {\n  case 'admin': return true;\n  default: return false;\n}"]},
+    },
+    {
+        "id": "default-permission-lookup-true", "check_id": "DEFAULT-ALLOW-001", "title": "Permission lookup defaults to True", "files": ["py", "js"],
+        "pattern": r"(?i)(permission|perm|allowed|access|acl|rule|can_\w+|policy)\w*\.get\(\s*[^,\n]+,\s*(True|true)\s*\)|(permission|perm|allowed|access|acl)\w*\[[^\]\n]+\]\s*\?\?\s*true",
+        "confidence": "HIGH",
+        "examples": {"match": ["if PERMISSIONS.get(action, True):"], "no_match": ["if PERMISSIONS.get(action, False):"]},
+    },
+    {
+        "id": "default-empty-allowlist-allows-all", "check_id": "DEFAULT-ALLOW-001", "title": "Empty allow-list means allow everything", "files": ["code"],
+        "pattern": r"(?i)(allow(ed)?_?(list|origins|hosts|ips|domains|users|emails)|whitelist|allowlist)\w*(\.length\s*===?\s*0|\.size\s*===?\s*0|\s+is\s+None|\s*==\s*\[\]|\.isEmpty\(\)|\.empty\?)\s*\)?\s*(\|\||\bor\b|\)\s*return\s+true|\?\s*true|:\s*return\s+True|\{\s*return\s+true)|if\s+not\s+(allow\w*|whitelist\w*)\s*:\s*return\s+True",
+        "confidence": "MEDIUM", "note": "A config mistake (empty list, failed load) then opens the door. Treat an empty allow-list as deny-all.",
+        "examples": {"match": ["if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return true;", "if not allowlist: return True"],
+                     "no_match": ["if (allowedOrigins.includes(origin)) return true;"]},
+    },
+    # ------------------------------------------------------------------ NULL / UNDEFINED
+    {
+        "id": "default-undefined-equals-undefined", "check_id": "DEFAULT-NULL-001", "title": "Request value compared to an env var that may be unset", "files": ["js", "py", "rb", "php"],
+        "pattern": r"(req\.headers\[['\"][\w-]+['\"]\]|req\.(get|header)\(\s*['\"][\w-]+['\"]\)|request\.headers\.get\(\s*['\"][\w-]+['\"]\)|headers\(\)\.get\(\s*['\"][\w-]+['\"]\)|req\.query\.\w+|req\.body\.\w+|searchParams\.get\(\s*['\"]\w+['\"]\))\s*(===?|!==?)\s*process\.env\.\w+|process\.env\.\w+\s*(===?|!==?)\s*(req\.|request\.|headers\(\)|searchParams)|request\.(headers|args|GET|POST)\.get\([^)\n]*\)\s*(==|!=)\s*os\.(environ\.get|getenv)\(|os\.(environ\.get|getenv)\([^)\n]*\)\s*(==|!=)\s*request\.",
+        "not_near": {"pattern": r"(?i)if\s*\(\s*!\s*process\.env\.\w+|throw new Error\([^)]*(required|missing|must be set)|assert\s|is None:\s*raise|required\w*\(", "lines": 4},
+        "confidence": "HIGH", "note": "If the variable is unset and the header is absent, undefined === undefined (None == None) is true and the check passes. Fail when the secret is missing, and compare with a constant-time function.",
+        "examples": {"match": ["if (req.headers['x-api-key'] === process.env.INTERNAL_API_KEY) return next();", "if request.headers.get('X-Token') == os.environ.get('ADMIN_TOKEN'):"],
+                     "no_match": ["if (!process.env.INTERNAL_API_KEY) throw new Error('INTERNAL_API_KEY is required');\nif (req.headers['x-api-key'] === process.env.INTERNAL_API_KEY) return next();"]},
+    },
+    {
+        "id": "default-missing-expected-allows", "check_id": "DEFAULT-NULL-001", "title": "Check passes when the expected value is missing", "files": ["code"],
+        "pattern": r"(?i)!\s*[\w.]*(expected|secret|sig|signature|token|hmac|api_?key)\w*\s*\|\|\s*[\w.]+\s*===?\s*[\w.]+|\b[\w.]*(expected|secret|signature|token)\w*\s+is\s+None\s+or\s+[\w.]+\s*==\s*[\w.]+",
+        "confidence": "HIGH",
+        "examples": {"match": ["return !expectedSig || sig === expectedSig;"], "no_match": ["return Boolean(expectedSig) && timingSafeEqual(sig, expectedSig);"]},
+    },
+    # ------------------------------------------------------------------ LIBRARY DEFAULTS
+    {
+        "id": "default-cors-no-options", "check_id": "DEFAULT-LIB-001", "title": "CORS middleware with its permissive defaults", "files": ["js", "py"],
+        "pattern": r"\bapp\.use\(\s*cors\(\s*\)\s*\)|\bcors\(\s*\)\s*[,)]|^\s*CORS\(\s*app\s*\)\s*$", "confidence": "MEDIUM",
+        "note": "cors() / CORS(app) allow every origin. Fine for a public, cookie-less API; list origins otherwise.",
+        "examples": {"match": ["app.use(cors());", "CORS(app)"], "no_match": ["app.use(cors({ origin: ['https://app.acme.com'] }));"]},
+    },
+    {
+        "id": "default-trust-proxy-all", "check_id": "DEFAULT-LIB-001", "title": "Every proxy trusted for client IP / protocol", "files": ["js", "py", "rb"],
+        "pattern": r"app\.set\(\s*['\"]trust proxy['\"]\s*,\s*true\s*\)|ProxyFix\([^)]*x_for\s*=\s*\d{2,}|forwarded_allow_ips\s*=\s*['\"]\*['\"]|--forwarded-allow-ips[= ]['\"]?\*",
+        "confidence": "LOW", "note": "Any client can then spoof X-Forwarded-For, defeating IP rate limits and audit logs. Trust the exact number of hops (e.g. 1) or the proxy's IP range.",
+        "examples": {"match": ["app.set('trust proxy', true);"], "no_match": ["app.set('trust proxy', 1);"]},
+    },
+    {
+        "id": "default-cookie-secure-off", "check_id": "DEFAULT-LIB-001", "title": "Session cookie Secure flag off", "files": ["code", "config"],
+        "pattern": r"(?i)cookie\s*:\s*\{[^}\n]*\bsecure\s*:\s*false|SESSION_COOKIE_SECURE\s*=\s*False|CSRF_COOKIE_SECURE\s*=\s*False|secure_cookies?\s*=\s*False|\.setSecure\(\s*false\s*\)",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["app.use(session({ secret, cookie: { secure: false } }));", "SESSION_COOKIE_SECURE = False"], "no_match": ["app.use(session({ secret, cookie: { secure: true, httpOnly: true } }));"]},
+    },
+    # ------------------------------------------------------------------ PERMISSIONS
+    {
+        "id": "default-world-writable", "check_id": "DEFAULT-PERM-001", "title": "World-writable or world-readable permissions", "files": ["code", "shell", "docker"],
+        "pattern": r"(?i)os\.chmod\([^)\n]*0o?7[0-7][67]\b|chmod\(\s*[^,\n]+,\s*0o?7[0-7][67]\b|\bchmod\s+(-R\s+)?(777|776|766|666|a\+w|o\+w)\b|\bumask\(\s*0+\s*\)|\bmode\s*[:=]\s*0o?(777|666)\b|os\.MkdirAll\([^)\n]*0777|os\.WriteFile\([^)\n]*0666|os\.ModePerm",
+        "confidence": "MEDIUM",
+        "examples": {"match": ["os.chmod(path, 0o777)", "RUN chmod -R 777 /app", "fs.mkdirSync(dir, { mode: 0o777 });"], "no_match": ["os.chmod(key_path, 0o600)"]},
+    },
+    # ------------------------------------------------------------------ DEFAULT CREDENTIALS
+    {
+        "id": "default-admin-password", "check_id": "DEFAULT-ADMIN-001", "title": "Default/weak password for an admin or seeded account", "files": ["code", "config", "env", "sql", "docker", "shell"],
+        "pattern": r"(?i)(password|passwd|pwd|pass)\w*['\"]?\s*[:=]+\s*(?:await\s+)?(?:[\w.:]*(?:hash|make_password|password_hash|encrypt)\w*\(\s*)?['\"]?(admin|admin123|administrator|password|password1|password123|123456|12345678|changeme|letmein|root|toor|qwerty|default|guest)['\"]?\s*(,|;|\)|\}|$)",
+        "near": {"pattern": r"(?i)admin|root|superuser|seed|create\w*user|default|owner", "lines": 4},
+        "path_excludes": r"(?i)(\.test\.|\.spec\.|/tests?/|/fixtures?/|docker-compose\.(dev|test|local))", "confidence": "HIGH",
+        "note": "Seed scripts and first-run setup often reach production. Generate a random initial password or require setting one on first login.",
+        "examples": {"match": ["await prisma.user.create({ data: { email: 'admin@acme.com', role: 'ADMIN', password: await hash('admin123') } });", "ADMIN_PASSWORD=changeme"],
+                     "no_match": ["const password = crypto.randomBytes(24).toString('base64url'); // initial admin password"]},
+    },
+    {
+        "id": "default-setup-endpoint", "check_id": "DEFAULT-ADMIN-001", "title": "First-run setup/installer endpoint", "files": ["code"],
+        "pattern": r"(?i)['\"`]/(api/)?(setup|install|installer|init|bootstrap|first[-_]?run|create[-_]?first[-_]?admin|onboard[-_]?admin)['\"`/]", "confidence": "LOW",
+        "note": "Confirm it refuses to run once an admin exists, so nobody can re-run setup and take over the instance.",
+        "examples": {"match": ["app.post('/api/setup', createFirstAdmin);"], "no_match": ["app.post('/api/settings', saveSettings);"]},
+    },
+]
