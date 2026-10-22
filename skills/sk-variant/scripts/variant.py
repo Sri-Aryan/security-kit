@@ -26,6 +26,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import sk_scan  # noqa: E402  (bundled copy of the SecurityKit rule engine)
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 LINE_SLACK = 3
 SEVERITY_ORDER = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
@@ -158,7 +160,7 @@ def cmd_sweep(args):
 def emit(result, out_path, summary):
     text = json.dumps(result, indent=2)
     if out_path:
-        os.makedirs(os.path.dirname(os.path.abspath(out_path)) or ".", exist_ok=True)
+        prepare_output(out_path)
         with open(out_path, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"{summary} → {out_path}")
