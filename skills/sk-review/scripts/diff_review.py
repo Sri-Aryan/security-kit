@@ -22,6 +22,8 @@ import subprocess
 import sys
 import tempfile
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 
 # Removed lines that look like security controls (REVIEW-REMOVED-001).
@@ -280,7 +282,7 @@ def main(argv=None):
     }
     text = json.dumps(result, indent=2)
     if args.out:
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"{desc}: {len(files)} files, {len(in_diff)} candidates on changed lines, "
