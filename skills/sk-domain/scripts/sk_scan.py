@@ -49,6 +49,8 @@ import subprocess
 import sys
 from collections import Counter
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 
 GROUPS = {
@@ -526,7 +528,7 @@ def main(argv=None):
     result = scan(args.root, rules, args.include_tests, args.agent_dirs, only)
     text = json.dumps(result, indent=2)
     if args.out:
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         # Per-check counts on the summary line let an agent re-check a fix without re-reading the whole file.
