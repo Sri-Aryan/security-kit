@@ -1,6 +1,7 @@
 ---
 name: sk-race
 description: Finds race conditions and TOCTOU bugs, covering balance and stock updates, check-then-insert, single-use tokens and coupons, quotas, missing transactions and non-idempotent endpoints. Use when the user asks about race conditions, double spending, concurrency or idempotency, or types /sk-race.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

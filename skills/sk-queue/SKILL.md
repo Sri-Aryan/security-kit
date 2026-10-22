@@ -1,6 +1,7 @@
 ---
 name: sk-queue
 description: Audits message queues, background jobs and cron (RabbitMQ, Kafka, SQS, Redis, Sidekiq, Celery, BullMQ and others), covering broker auth, unsafe serializers, authorization in workers, idempotency and exposed job dashboards. Use when the project uses queues or workers, or types /sk-queue.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

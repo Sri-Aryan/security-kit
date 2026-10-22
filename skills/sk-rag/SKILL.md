@@ -1,6 +1,7 @@
 ---
 name: sk-rag
 description: Audits RAG pipelines and vector stores, covering document poisoning, per-chunk access control, tenant isolation at retrieval, vector database exposure and deletion propagation. Use when the project has embeddings, a vector store or chat-with-your-documents, or types /sk-rag.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
