@@ -1,6 +1,7 @@
 ---
 name: sk-xss
 description: Finds cross-site scripting, covering raw DOM sinks, framework escaping bypasses (dangerouslySetInnerHTML, v-html, |safe), disabled auto-escaping, javascript URLs, unsafe Markdown and weak CSP. Use when the user asks about XSS, HTML injection or CSP, or types /sk-xss.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

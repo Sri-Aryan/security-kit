@@ -1,6 +1,7 @@
 ---
 name: sk-websocket
 description: Audits WebSockets, SSE and hosted real-time services, covering handshake auth, Origin checks, tokens in URLs, channel authorization, message validation, limits and leaky broadcasts. Use when the project has real-time features, or types /sk-websocket.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

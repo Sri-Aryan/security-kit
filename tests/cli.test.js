@@ -275,6 +275,25 @@ test('every shipped skill has valid frontmatter with an sk- name and description
   }
 });
 
+// Every skill description an agent may pick on its own is in context on every turn, in every project. Only the
+// workflow skills carry one; specialists run when typed, or through /sk-audit's one-area routing.
+test('only workflow skills are model-invocable; specialists set disable-model-invocation', () => {
+  const { availableSkills, parseFrontmatter } = require('../src/skills');
+  const catalog = JSON.parse(fs.readFileSync(path.join(REPO, 'skills', 'catalog.json'), 'utf8'));
+  const workflows = new Set(catalog.groups.find((g) => g.id === 'workflows').skills.map((s) => s.name));
+  let listed = 0;
+  for (const s of availableSkills()) {
+    const fm = parseFrontmatter(fs.readFileSync(path.join(s.dir, 'SKILL.md'), 'utf8'));
+    if (workflows.has(s.name)) {
+      assert.equal(fm['disable-model-invocation'], undefined, `${s.name} is a workflow skill and must stay model-invocable`);
+      listed += s.description.length;
+    } else {
+      assert.equal(fm['disable-model-invocation'], 'true', `${s.name} needs "disable-model-invocation: true"`);
+    }
+  }
+  assert.ok(listed <= 2000, `workflow descriptions total ${listed} chars; keep the always-loaded listing small`);
+});
+
 test('catalog lists every shipped skill exactly once', () => {
   const { availableSkills } = require('../src/skills');
   const catalog = JSON.parse(fs.readFileSync(path.join(REPO, 'skills', 'catalog.json'), 'utf8'));
