@@ -294,6 +294,18 @@ test('only workflow skills are model-invocable; specialists set disable-model-in
   assert.ok(listed <= 2000, `workflow descriptions total ${listed} chars; keep the always-loaded listing small`);
 });
 
+test('init --project keeps .securitykit out of git except the manifest and suppressions', () => {
+  const dir = tmpdir();
+  assert.equal(run(['init', '--kit', 'claude', '--skills', 'sk-api', '--dir', dir]).code, 0);
+  const gitignore = path.join(dir, '.securitykit', '.gitignore');
+  assert.equal(fs.readFileSync(gitignore, 'utf8'), require('../src/manifest').STATE_GITIGNORE);
+  assert.match(fs.readFileSync(gitignore, 'utf8'), /^!manifest\.json$/m);
+  // A user's own edit survives later writes.
+  fs.writeFileSync(gitignore, 'custom\n');
+  assert.equal(run(['update', '--dir', dir]).code, 0);
+  assert.equal(fs.readFileSync(gitignore, 'utf8'), 'custom\n');
+});
+
 test('catalog lists every shipped skill exactly once', () => {
   const { availableSkills } = require('../src/skills');
   const catalog = JSON.parse(fs.readFileSync(path.join(REPO, 'skills', 'catalog.json'), 'utf8'));

@@ -7,6 +7,17 @@ const { UserError } = require('./errors');
 
 const SCHEMA_VERSION = 1;
 
+// Same file the skills' scripts write (shared/scripts/sk_outputs.py STATE_GITIGNORE; a test keeps them in step).
+// Reports in .securitykit/ describe unfixed weaknesses; the manifest and suppressions are meant to be committed.
+const STATE_GITIGNORE = [
+  '# Written by SecurityKit. Scan results and reports describe weaknesses that may not be fixed yet, so they stay',
+  "# out of git. Suppressions (ignore.json) and a project install's manifest.json are meant to be committed.",
+  '*',
+  '!ignore.json',
+  '!manifest.json',
+  '',
+].join('\n');
+
 function emptyManifest(kitVersion) {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -51,6 +62,8 @@ function writeManifest(projectDir, manifest) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const sorted = { ...manifest, files: Object.fromEntries(Object.entries(manifest.files).sort()) };
   fs.writeFileSync(file, JSON.stringify(sorted, null, 2) + '\n');
+  const gitignore = path.join(path.dirname(file), '.gitignore');
+  if (!fs.existsSync(gitignore)) fs.writeFileSync(gitignore, STATE_GITIGNORE);
 }
 
-module.exports = { SCHEMA_VERSION, emptyManifest, readManifest, writeManifest };
+module.exports = { SCHEMA_VERSION, STATE_GITIGNORE, emptyManifest, readManifest, writeManifest };
