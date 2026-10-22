@@ -1,6 +1,7 @@
 ---
 name: sk-passkeys
 description: Audits passwordless login, covering passkey/WebAuthn challenges, origins and verification, magic-link tokens and email-scanner clicks, and one-time code generation and attempt limits. Use when the user asks about passkeys, WebAuthn, magic links, OTP or passwordless login, or types /sk-passkeys.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

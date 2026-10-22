@@ -1,6 +1,7 @@
 ---
 name: sk-password
 description: Audits the password lifecycle, covering hashing algorithms and work factors, plaintext storage, password policy and breached-password checks, and the reset flow (tokens, expiry, enumeration). Use when the user asks about password storage, hashing, policy or forgot-password flows, or types /sk-password.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

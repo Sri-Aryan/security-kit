@@ -1,6 +1,7 @@
 ---
 name: sk-paas
 description: Audits hosting config for Vercel, Netlify, Cloudflare Workers, Render, Railway, Fly.io, Heroku and Firebase Hosting, covering committed secrets, preview deployments, exposed services, open proxies and cron secrets. Use when the user asks about deployment or platform security, or types /sk-paas.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
