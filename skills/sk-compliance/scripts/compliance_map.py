@@ -18,6 +18,8 @@ import json
 import os
 import sys
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 SEVERITIES = ["Critical", "High", "Medium", "Low"]
 
@@ -210,7 +212,8 @@ def main(argv=None):
     result = build(root, wanted)
     out = args.out or os.path.join(root, ".securitykit", "compliance-map.json")
     md = args.md or os.path.join(root, "security-report-compliance.md")
-    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    prepare_output(out)
+    prepare_output(md)
     with open(out, "w", encoding="utf-8") as fh:
         json.dump(result, fh, indent=2)
         fh.write("\n")
