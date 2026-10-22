@@ -16,6 +16,8 @@ import shutil
 import sys
 from urllib.parse import urlparse
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 ZAP_IMAGE = "ghcr.io/zaproxy/zaproxy:stable"
 RISK = {0: "Info", 1: "Low", 2: "Medium", 3: "High"}
@@ -108,6 +110,7 @@ def cmd_convert(args):
               "candidates": candidates}
     text = json.dumps(result, indent=2)
     if args.out:
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"{len(candidates)} alert(s) -> {args.out}", file=sys.stderr)
