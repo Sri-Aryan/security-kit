@@ -1,6 +1,7 @@
 ---
 name: sk-webhooks
 description: Audits webhooks received (signature over the raw body, replay, idempotency) and sent (SSRF on user URLs, signing, timeouts). Use when the project receives provider webhooks or lets users register callback URLs, or types /sk-webhooks.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

@@ -1,6 +1,7 @@
 ---
 name: sk-upload
 description: Audits file uploads, covering content-type validation, generated file names and path traversal, size limits, inline HTML/SVG serving, public storage ACLs, presigned uploads, zip slip and risky processors. Use when the project accepts files, or types /sk-upload.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

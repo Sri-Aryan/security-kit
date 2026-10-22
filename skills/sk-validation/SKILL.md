@@ -1,6 +1,7 @@
 ---
 name: sk-validation
 description: Audits input validation at entry points, covering schema validation on every endpoint, client-only checks, unknown fields and mass assignment, type confusion and number ranges. Use when the user asks about input validation, mass assignment or schema validation, or types /sk-validation.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
