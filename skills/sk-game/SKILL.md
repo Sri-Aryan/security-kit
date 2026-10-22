@@ -1,6 +1,7 @@
 ---
 name: sk-game
 description: Audits games and game backends for client trust, covering server authority, client-written scores, virtual economy, IAP and rewarded-ad validation, RPC ownership and keys in client builds (Unity, Godot, Unreal, Roblox, web). Use when the user asks about cheating, leaderboards, IAP or multiplayer security, or types /sk-game.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

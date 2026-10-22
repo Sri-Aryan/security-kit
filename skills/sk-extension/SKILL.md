@@ -1,6 +1,7 @@
 ---
 name: sk-extension
 description: Audits browser extensions (Chrome, Edge, Firefox, Safari) for broad host permissions, remote code, weak extension CSP, unchecked message senders, unsafe content scripts and shipped secrets. Use when the project is a browser extension, or types /sk-extension.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

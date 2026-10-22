@@ -1,6 +1,7 @@
 ---
 name: sk-fuzz
 description: Finds code worth fuzzing (parsers, decoders, validators) and sets up property-based tests and coverage-guided fuzzing in the project's own tools. Use when the user asks for fuzzing, property-based tests or parser hardening, or types /sk-fuzz.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
