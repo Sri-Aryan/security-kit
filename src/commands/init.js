@@ -48,9 +48,9 @@ async function init(flags) {
   log.dim(`  Manifest: ${displayPath(root, manifestPath(root.dir))}`);
   log.heading('Next');
   if (root.scope === 'global') {
-    log.info(`  Open any project in your AI agent and run ${c.cyan('/sk-help')} to see all commands,`);
+    log.info(`  Open any project in your AI agent and run ${c.cyan('/sk-help')} to see what to run first,`);
   } else {
-    log.info(`  Open this project in your AI agent and run ${c.cyan('/sk-help')} to see all commands,`);
+    log.info(`  Open this project in your AI agent and run ${c.cyan('/sk-help')} to see what to run first,`);
   }
   log.info(`  or start with ${c.cyan('/sk-audit')} (whole project) or ${c.cyan('/sk-review')} (your current changes).`);
   log.dim('  Agent not listed? Point it at the .agents/skills folder, or see the README.');

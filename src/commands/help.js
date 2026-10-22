@@ -34,7 +34,7 @@ ${c.bold('Options')}
   --version, -v             Print version
 
 ${c.bold('In your agent')}
-  /sk-help                  List all SecurityKit commands, grouped
+  /sk-help                  What to run first for this project, and every command
   /sk-audit                 Audit the whole project and get one combined report
   /sk-review                Review the current change before you merge it
   /sk-fix                   Fix findings one by one, with your approval
