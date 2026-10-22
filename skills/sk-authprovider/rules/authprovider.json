@@ -1,0 +1,418 @@
+{
+  "_generated": "from tools/rules_src/authprovider.py; edit the source and run tools/build_rules.py",
+  "macros": {
+    "UNTRUSTED": "req\\.(body|query|params|headers|json\\(\\))|c\\.req\\.(json|query|param)\\(|request\\.(body|json|args|form|headers|query_params)|\\bbody\\b|\\bparams\\b|searchParams\\.get\\(|formData\\.get\\(|headers\\(\\)\\.get\\(|cookies\\(\\)\\.get\\("
+  },
+  "rules": [
+    {
+      "id": "authp-supabase-getsession-server",
+      "check_id": "AUTHP-SERVER-001",
+      "title": "supabase.auth.getSession() trusted on the server",
+      "files": [
+        "js"
+      ],
+      "path_includes": "(?i)(middleware\\.|proxy\\.|route\\.[cm]?[jt]s$|/server/|\\.server\\.|/api/|actions?\\.[jt]s$|/actions/|\\+page\\.server|\\+layout\\.server|\\+server\\.|hooks\\.server|loader|/lib/)",
+      "pattern": "\\.auth\\.getSession\\(\\)",
+      "confidence": "MEDIUM",
+      "note": "On the server getSession() reads the cookie without revalidating the JWT signature against Supabase. Use auth.getUser() or auth.getClaims() for authorization decisions.",
+      "examples": {
+        "match": [
+          "const { data: { session } } = await supabase.auth.getSession();\nif (!session) redirect('/login');"
+        ],
+        "no_match": [
+          "const { data: { user } } = await supabase.auth.getUser();"
+        ]
+      }
+    },
+    {
+      "id": "authp-token-decoded-not-verified",
+      "check_id": "AUTHP-SERVER-001",
+      "title": "Provider token decoded without signature verification",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\bjwtDecode\\(|\\bjwt_decode\\(|\\bjose\\.decodeJwt\\(|\\bdecodeJwt\\(|\\bparseJwt\\(|\\bjwt\\.decode\\([^)\\n]*(verify_signature['\\\"]?\\s*:\\s*False|complete\\s*:\\s*true)?|atob\\(\\s*\\w+\\.split\\(\\s*['\\\"]\\.['\\\"]\\s*\\)\\[1\\]\\s*\\)",
+      "file_excludes": "jwt\\.verify\\(|jwtVerify\\(|verifyIdToken\\(|verifyToken\\(|createRemoteJWKSet|verify_jwt|decode\\([^)]*algorithms\\s*=|PyJWKClient|verifyAccessToken|authenticateRequest",
+      "path_excludes": "(?i)(components|hooks|views|screens|client|frontend)/",
+      "confidence": "MEDIUM",
+      "note": "Decoding reads claims anyone can forge. Verify with the provider's SDK (verifyToken, verifyIdToken) or a JWKS check of issuer, audience and expiry.",
+      "examples": {
+        "match": [
+          "const claims = jwtDecode(req.headers.authorization.slice(7));\nif (claims.role === 'admin') next();"
+        ],
+        "no_match": [
+          "const { payload } = await jwtVerify(token, JWKS, { issuer, audience });"
+        ]
+      }
+    },
+    {
+      "id": "authp-user-id-from-request",
+      "check_id": "AUTHP-SERVER-001",
+      "title": "User ID taken from the request instead of the session",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\b(const|let|var)?\\s*\\{?\\s*(userId|user_id|uid|clerkId|clerk_user_id|auth0Id|sub)\\b[^=\\n]*=\\s*(await\\s+)?({{UNTRUSTED}})|\\b(user_id|uid)\\s*=\\s*request\\.(json|args|form|data)\\s*(\\[|\\.get\\()\\s*['\\\"](user_id|userId|uid)['\\\"]",
+      "not_near": {
+        "pattern": "(?i)(===?|!==?)\\s*(session|auth|user|claims)\\w*\\.(user)?_?[iI]d|isAdmin|is_admin|role\\s*===?\\s*['\\\"]admin",
+        "lines": 4
+      },
+      "confidence": "MEDIUM",
+      "note": "Take the user ID from auth() / the verified token. A client-sent ID lets anyone act as anyone.",
+      "examples": {
+        "match": [
+          "const { userId } = await req.json();",
+          "const userId = searchParams.get('userId');",
+          "user_id = request.json['user_id']"
+        ],
+        "no_match": [
+          "const { userId } = await auth();"
+        ]
+      }
+    },
+    {
+      "id": "authp-role-in-user-metadata",
+      "check_id": "AUTHP-ROLE-001",
+      "title": "Role/plan read from user-editable metadata",
+      "files": [
+        "code",
+        "sql"
+      ],
+      "pattern": "(?i)(unsafeMetadata|unsafe_metadata|user_metadata|userMetadata|raw_user_meta_data)\\b[^\\n]*\\b(role|roles|is_?admin|admin|plan|tier|permissions?|is_?pro|credits|subscription)\\b",
+      "confidence": "HIGH",
+      "note": "Clerk unsafeMetadata, Supabase user_metadata and Auth0 user_metadata are writable by the user. Use publicMetadata/privateMetadata, app_metadata, or your own table.",
+      "examples": {
+        "match": [
+          "if (user.unsafeMetadata.role === 'admin') return <AdminPanel />;",
+          "const plan = user.user_metadata.plan;"
+        ],
+        "no_match": [
+          "if (sessionClaims?.metadata?.role === 'admin') {}",
+          "const plan = user.app_metadata.plan;"
+        ]
+      }
+    },
+    {
+      "id": "authp-client-writes-metadata-role",
+      "check_id": "AUTHP-ROLE-001",
+      "title": "Client updates role/plan in user metadata",
+      "files": [
+        "js",
+        "dart",
+        "swift",
+        "kt"
+      ],
+      "pattern": "(?i)(user\\.update\\(\\s*\\{\\s*unsafeMetadata|auth\\.updateUser\\(\\s*\\{\\s*data\\s*:)[^\\n]*\\b(role|is_?admin|plan|tier|credits)\\b",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "await supabase.auth.updateUser({ data: { role: 'admin' } });"
+        ],
+        "no_match": [
+          "await supabase.auth.updateUser({ data: { display_name: name } });"
+        ]
+      }
+    },
+    {
+      "id": "authp-dangerous-linking",
+      "check_id": "AUTHP-LINK-001",
+      "title": "Accounts linked by email without proof of ownership",
+      "files": [
+        "code"
+      ],
+      "pattern": "allowDangerousEmailAccountLinking\\s*:\\s*true|allowDifferentEmails\\s*:\\s*true|trustEmail\\s*:\\s*true|trust_email\\s*=\\s*True",
+      "confidence": "HIGH",
+      "note": "Safe only when every linked provider verifies email ownership. Otherwise an attacker registers your victim's email at a weaker provider and signs into their account.",
+      "examples": {
+        "match": [
+          "GitHub({ allowDangerousEmailAccountLinking: true })"
+        ],
+        "no_match": [
+          "GitHub({ clientId, clientSecret })"
+        ]
+      }
+    },
+    {
+      "id": "authp-email-claim-unverified",
+      "check_id": "AUTHP-LINK-001",
+      "title": "Email claim used without checking email_verified",
+      "files": [
+        "code"
+      ],
+      "pattern": "\\b(profile|claims|payload|userinfo|idToken|id_token|tokenInfo|decoded)\\.email\\b",
+      "not_near": {
+        "pattern": "email_verified|emailVerified|verified_email|isEmailVerified",
+        "lines": 6
+      },
+      "file_requires": "(?i)signIn|callbacks|profile\\(|oauth|oidc|idToken|userinfo|sso",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "async signIn({ profile }) {\n  const user = await db.user.findUnique({ where: { email: profile.email } });\n}"
+        ],
+        "no_match": [
+          "async signIn({ profile }) {\n  if (!profile.email_verified) return false;\n  const user = await db.user.findUnique({ where: { email: profile.email } });\n}"
+        ]
+      }
+    },
+    {
+      "id": "authp-secret-public-env",
+      "check_id": "AUTHP-SECRET-001",
+      "title": "Auth provider secret in a public env variable",
+      "files": [
+        "code",
+        "web",
+        "env",
+        "config"
+      ],
+      "pattern": "(?i)\\b(NEXT_PUBLIC_|VITE_|REACT_APP_|EXPO_PUBLIC_|NUXT_PUBLIC_|PUBLIC_|GATSBY_)\\w*(CLERK_SECRET|AUTH0_CLIENT_SECRET|AUTH0_SECRET|AUTH_SECRET|NEXTAUTH_SECRET|BETTER_AUTH_SECRET|WORKOS_API_KEY|KINDE_CLIENT_SECRET|STYTCH_SECRET|DESCOPE_MANAGEMENT|PROPELAUTH_API_KEY|STACK_SECRET|CLIENT_SECRET)\\w*",
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "NEXT_PUBLIC_CLERK_SECRET_KEY=placeholder"
+        ],
+        "no_match": [
+          "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=placeholder"
+        ]
+      }
+    },
+    {
+      "id": "authp-hardcoded-session-secret",
+      "check_id": "AUTHP-SECRET-001",
+      "title": "Session/JWT signing secret hard-coded in auth config",
+      "files": [
+        "js",
+        "py"
+      ],
+      "pattern": "(?i)\\bsecret\\s*[:=]\\s*['\\\"`][^'\\\"`$]{1,}['\\\"`]",
+      "near": {
+        "pattern": "NextAuth|betterAuth|authOptions|AuthOptions|NextAuthConfig|lucia|getIronSession|ironSession|sessionOptions|SvelteKitAuth|ExpressAuth|auth0|handleAuth|cookieSecret",
+        "lines": 25
+      },
+      "confidence": "MEDIUM",
+      "note": "Anyone with this value can mint sessions for any user. Load it from the environment and fail when missing.",
+      "examples": {
+        "match": [
+          "export const authOptions = {\n  providers: [GitHub],\n  secret: 'my-dev-secret',\n};"
+        ],
+        "no_match": [
+          "export const authOptions = {\n  providers: [GitHub],\n  secret: process.env.AUTH_SECRET,\n};"
+        ]
+      }
+    },
+    {
+      "id": "authp-trust-host",
+      "check_id": "AUTHP-CALLBACK-001",
+      "title": "Auth library trusts the request Host header",
+      "files": [
+        "code",
+        "env",
+        "config"
+      ],
+      "pattern": "trustHost\\s*:\\s*true|AUTH_TRUST_HOST\\s*=\\s*['\\\"]?(true|1)",
+      "confidence": "LOW",
+      "note": "Correct behind a proxy you control that sets Host (Vercel sets this for you). Elsewhere, a forged Host header can poison callback and email-link URLs; set AUTH_URL instead.",
+      "examples": {
+        "match": [
+          "export const { auth } = NextAuth({ trustHost: true, providers })"
+        ],
+        "no_match": [
+          "export const { auth } = NextAuth({ providers })"
+        ]
+      }
+    },
+    {
+      "id": "authp-redirect-callback-open",
+      "check_id": "AUTHP-CALLBACK-001",
+      "title": "Custom redirect callback without an origin check",
+      "files": [
+        "js"
+      ],
+      "pattern": "\\b(async\\s+)?redirect\\s*\\(\\s*\\{\\s*url\\b",
+      "not_near": {
+        "pattern": "startsWith\\(\\s*baseUrl|new URL\\(\\s*url\\s*\\)\\.origin\\s*===?\\s*baseUrl|\\.origin\\s*===?\\s*|startsWith\\(\\s*['\\\"`]/",
+        "lines": 6
+      },
+      "confidence": "MEDIUM",
+      "note": "Returning `url` unchecked turns the callbackUrl parameter into an open redirect after login.",
+      "examples": {
+        "match": [
+          "callbacks: {\n  async redirect({ url, baseUrl }) {\n    return url;\n  },\n}"
+        ],
+        "no_match": [
+          "callbacks: {\n  async redirect({ url, baseUrl }) {\n    if (url.startsWith('/')) return `${baseUrl}${url}`;\n    return new URL(url).origin === baseUrl ? url : baseUrl;\n  },\n}"
+        ]
+      }
+    },
+    {
+      "id": "authp-provider-tokens-in-session",
+      "check_id": "AUTHP-SESSION-001",
+      "title": "Provider access/refresh token copied into the client session",
+      "files": [
+        "js"
+      ],
+      "pattern": "\\bsession\\.(accessToken|access_token|refreshToken|refresh_token|idToken|id_token)\\s*=|\\bsession\\s*:\\s*\\{[^}\\n]*\\b(accessToken|refreshToken|refresh_token)\\b",
+      "confidence": "MEDIUM",
+      "note": "The session callback result is readable in the browser via useSession(). Never expose refresh tokens; keep provider tokens server-side.",
+      "examples": {
+        "match": [
+          "async session({ session, token }) {\n  session.refreshToken = token.refreshToken;\n  return session;\n}"
+        ],
+        "no_match": [
+          "async session({ session, token }) {\n  session.user.id = token.sub;\n  return session;\n}"
+        ]
+      }
+    },
+    {
+      "id": "authp-clerk-middleware-protects-nothing",
+      "check_id": "AUTHP-MW-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "clerkMiddleware() without any route protection",
+      "files": [
+        "js"
+      ],
+      "path_includes": "(?i)(^|/)(src/)?(middleware|proxy)\\.[cm]?[jt]s$",
+      "when": "clerkMiddleware\\(",
+      "missing": "\\.protect\\(|redirectToSignIn|createRouteMatcher|userId|auth\\(\\)",
+      "confidence": "MEDIUM",
+      "note": "clerkMiddleware() makes auth available but protects no routes by default.",
+      "examples": {
+        "match": [
+          "import { clerkMiddleware } from '@clerk/nextjs/server';\nexport default clerkMiddleware();"
+        ],
+        "no_match": [
+          "const isProtected = createRouteMatcher(['/dashboard(.*)']);\nexport default clerkMiddleware(async (auth, req) => { if (isProtected(req)) await auth.protect(); });"
+        ]
+      }
+    },
+    {
+      "id": "authp-public-matcher-includes-api",
+      "check_id": "AUTHP-MW-001",
+      "title": "Public-route list includes all API routes",
+      "files": [
+        "js"
+      ],
+      "pattern": "(?i)isPublic\\w*\\s*=\\s*createRouteMatcher\\([^\\n]*?['\\\"]/api(\\(\\.\\*\\)|/\\(\\.\\*\\)|/:path\\*)['\\\"]|publicRoutes\\s*:\\s*\\[[^\\]\\n]*?['\\\"]/api(\\(\\.\\*\\)|/\\(\\.\\*\\)|/:path\\*)?['\\\"]|ignoredRoutes\\s*:",
+      "confidence": "MEDIUM",
+      "examples": {
+        "match": [
+          "const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/api(.*)']);"
+        ],
+        "no_match": [
+          "const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/api/webhooks(.*)']);"
+        ]
+      }
+    },
+    {
+      "id": "authp-user-webhook-unverified",
+      "check_id": "AUTHP-WEBHOOK-001",
+      "type": "absence",
+      "scope": "file",
+      "title": "Auth provider webhook handler without signature verification",
+      "files": [
+        "js",
+        "py"
+      ],
+      "path_includes": "(?i)webhook|/hooks?/",
+      "when": "(?i)user\\.(created|updated|deleted)|session\\.(created|ended|revoked)|organizationMembership\\.|organization\\.(created|deleted)|post-user-registration|before_user_created|custom_access_token|auth\\.hook|['\\\"]user_(created|deleted)['\\\"]",
+      "missing": "(?i)svix|new\\s+Webhook\\(|verifyWebhook|wh\\.verify|\\.verify\\(|constructEvent|timingSafeEqual|compare_digest|hmac|signature|standardwebhooks|unwrap\\(",
+      "confidence": "HIGH",
+      "note": "Without verification anyone can POST a fake user.created/role change and get an account or admin role in your database.",
+      "examples": {
+        "match": [
+          "export async function POST(req) {\n  const evt = await req.json();\n  if (evt.type === 'user.created') await db.user.create({ data: { id: evt.data.id } });\n}"
+        ],
+        "no_match": [
+          "import { Webhook } from 'svix';\nexport async function POST(req) {\n  const evt = new Webhook(secret).verify(payload, headers);\n  if (evt.type === 'user.created') {}\n}"
+        ]
+      }
+    },
+    {
+      "id": "authp-email-verification-off",
+      "check_id": "AUTHP-SIGNUP-001",
+      "title": "Email verification not required",
+      "files": [
+        "code",
+        "config"
+      ],
+      "pattern": "requireEmailVerification\\s*:\\s*false|emailVerification\\s*:\\s*\\{\\s*required\\s*:\\s*false|autoSignIn\\s*:\\s*true[^\\n]*requireEmailVerification\\s*:\\s*false|email_verification\\s*=\\s*['\\\"]?(none|optional)",
+      "confidence": "LOW",
+      "examples": {
+        "match": [
+          "emailAndPassword: { enabled: true, requireEmailVerification: false }"
+        ],
+        "no_match": [
+          "emailAndPassword: { enabled: true, requireEmailVerification: true }"
+        ]
+      }
+    },
+    {
+      "id": "authp-org-from-request",
+      "check_id": "AUTHP-ORG-001",
+      "title": "Active organization/tenant taken from the request",
+      "files": [
+        "code"
+      ],
+      "pattern": "(?i)\\b(orgId|org_id|organizationId|organization_id|tenantId|tenant_id|workspaceId|workspace_id|teamId|team_id)\\b[^=\\n]*=\\s*(await\\s+)?({{UNTRUSTED}})",
+      "not_near": {
+        "pattern": "(?i)membership|isMember|is_member|members\\.|hasAccess|authorize|can\\(|orgRole|org_role|\\.has\\(\\s*\\{|checkPermission|assertMember",
+        "lines": 8
+      },
+      "confidence": "MEDIUM",
+      "note": "Use the org from the verified session (e.g. Clerk auth().orgId) or check membership before using a client-supplied org.",
+      "examples": {
+        "match": [
+          "const { orgId } = await req.json();\nconst projects = await db.project.findMany({ where: { orgId } });"
+        ],
+        "no_match": [
+          "const { orgId } = await auth();\nconst projects = await db.project.findMany({ where: { orgId } });"
+        ]
+      }
+    },
+    {
+      "id": "authp-credentials-plain-compare",
+      "check_id": "AUTHP-CREDS-001",
+      "title": "Credentials provider compares plain-text passwords",
+      "files": [
+        "js",
+        "py"
+      ],
+      "pattern": "(?i)\\bpassword\\s*(===?|!==?)\\s*[\\w.]*(password|pwd)\\b|[\\w.]*(password|pwd)\\s*(===?|!==?)\\s*credentials\\.password",
+      "near": {
+        "pattern": "authorize|Credentials|credentials",
+        "lines": 15
+      },
+      "confidence": "HIGH",
+      "examples": {
+        "match": [
+          "async authorize(credentials) {\n  const user = await getUser(credentials.email);\n  if (user.password === credentials.password) return user;\n}"
+        ],
+        "no_match": [
+          "async authorize(credentials) {\n  if (await argon2.verify(user.passwordHash, credentials.password)) return user;\n}"
+        ]
+      }
+    },
+    {
+      "id": "authp-deprecated-library",
+      "check_id": "AUTHP-MAINT-001",
+      "title": "Deprecated or end-of-life auth package",
+      "files": [
+        ".json"
+      ],
+      "path_includes": "(^|/)package\\.json$",
+      "pattern": "\\\"(lucia|@lucia-auth/[\\w-]+|@supabase/auth-helpers-[\\w-]+|@clerk/clerk-sdk-node|@auth0/nextjs-auth0)\\\"\\s*:\\s*\\\"[\\^~]?(\\d+)",
+      "confidence": "LOW",
+      "note": "Lucia v3 and the Supabase auth-helpers are deprecated; @clerk/clerk-sdk-node is replaced by @clerk/express. Check the installed major version of @auth0/nextjs-auth0 against current advice.",
+      "examples": {
+        "match": [
+          "\"lucia\": \"^3.2.0\",",
+          "\"@supabase/auth-helpers-nextjs\": \"^0.10.0\","
+        ],
+        "no_match": [
+          "\"@supabase/ssr\": \"^0.5.0\","
+        ]
+      }
+    }
+  ]
+}
