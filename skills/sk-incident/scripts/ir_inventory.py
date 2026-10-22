@@ -16,6 +16,8 @@ import os
 import re
 import sys
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", "target", ".next", "__pycache__", ".venv", "venv",
              ".securitykit", ".claude", ".codex", ".agents", "coverage", ".terraform", "bin", "obj"}
@@ -79,7 +81,7 @@ def main(argv=None):
     }
     text = json.dumps(result, indent=2)
     if args.out:
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"{len(SIGNALS) - len(result['missing'])}/{len(SIGNALS)} areas with evidence -> {args.out}", file=sys.stderr)
