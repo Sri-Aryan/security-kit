@@ -1,12 +1,14 @@
 ---
 name: sk-api
-description: Audits a project's APIs for security issues, error handling and missing tests, then writes security-report.md with evidence and fixes. Use when the user asks to audit or review API security, check API auth or authorization (IDOR/BOLA), find API errors or injection bugs, review endpoints before release, generate API security tests, or types /sk-api. Supports Express, NestJS, FastAPI, Flask, Django/DRF, Spring Boot, Go net/http and Gin.
+description: Audits a project's APIs for authentication, object-level authorization (IDOR/BOLA), injection, error handling and missing tests (Express, NestJS, FastAPI, Flask, Django, Spring, Go). Use when the user asks to audit API security or review endpoints before release, or types /sk-api.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-api: API security audit
+
+**Scope.** Audits a project's APIs for security issues, error handling and missing tests, then writes security-report.md with evidence and fixes. Supports Express, NestJS, FastAPI, Flask, Django/DRF, Spring Boot, Go net/http and Gin.
 
 You are running a SecurityKit API audit. Scripts find **candidates**; you **confirm or reject** each one
 by reading the code; the report uses a **fixed template**. Work only on this machine: never send code,

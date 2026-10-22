@@ -1,12 +1,14 @@
 ---
 name: sk-auth
-description: Audits authentication in any language or framework, covering password hashing and policy, login brute-force protection, account enumeration, password reset and recovery, MFA enforcement, session fixation, logout and cookie flags, credentials in URLs or logs, default accounts, registration privilege fields and SSO account linking. Writes security-report-auth.md with evidence and fixes. Use when the user asks to audit login, signup, passwords, password reset, sessions, MFA or SSO security, or types /sk-auth.
+description: Audits authentication, covering login brute force, account enumeration, password reset, MFA, session fixation, logout, cookie flags and SSO account linking. Use when the user asks to audit login, signup, passwords, reset, sessions, MFA or SSO, or types /sk-auth.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-auth: authentication audit
+
+**Scope.** Audits authentication in any language or framework, covering password hashing and policy, login brute-force protection, account enumeration, password reset and recovery, MFA enforcement, session fixation, logout and cookie flags, credentials in URLs or logs, default accounts, registration privilege fields and SSO account linking. Writes security-report-auth.md with evidence and fixes.
 
 Authentication answers five questions in every stack: **how secrets are stored**, **how guessing is slowed
 down**, **how a lost secret is recovered**, **how a second factor is enforced**, and **how the resulting

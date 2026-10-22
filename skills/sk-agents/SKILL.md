@@ -1,12 +1,14 @@
 ---
 name: sk-agents
-description: Audits AI agents, tool/function calling and MCP servers in any language and framework, covering excessive tool permissions (shell, code, SQL, filesystem, HTTP), confused-deputy service credentials, tool arguments reaching shell/SQL/file/fetch sinks, loose tool schemas, unsandboxed code execution, missing human approval for destructive actions (auto-approve, bypassPermissions, --dangerously-skip-permissions), loop limits, tool output treated as instructions, shared memory, multi-agent escalation, and MCP trust (unpinned npx/uvx servers, plaintext tokens in mcp.json, broad filesystem roots, unauthenticated HTTP servers, Origin checks, token passthrough, tool poisoning). Based on the OWASP AI Agent Security and MCP Security cheat sheets. Writes security-report-agents.md. Use when the project builds agents, tools or MCP servers, or configures MCP servers/coding agents, and the user asks to audit them, or types /sk-agents.
+description: Audits AI agents, tool calling and MCP servers for over-broad tool permissions, tool input reaching shell, SQL or files, missing human approval, sandboxing and MCP config trust. Use when the project builds agents, tools or MCP servers or configures coding agents, or types /sk-agents.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-agents: agent, tool and MCP security audit
+
+**Scope.** Audits AI agents, tool/function calling and MCP servers in any language and framework, covering excessive tool permissions (shell, code, SQL, filesystem, HTTP), confused-deputy service credentials, tool arguments reaching shell/SQL/file/fetch sinks, loose tool schemas, unsandboxed code execution, missing human approval for destructive actions (auto-approve, bypassPermissions, --dangerously-skip-permissions), loop limits, tool output treated as instructions, shared memory, multi-agent escalation, and MCP trust (unpinned npx/uvx servers, plaintext tokens in mcp.json, broad filesystem roots, unauthenticated HTTP servers, Origin checks, token passthrough, tool poisoning). Based on the OWASP AI Agent Security and MCP Security cheat sheets. Writes security-report-agents.md.
 
 Assume the agent **will** be manipulated (prompt injection: `/sk-prompt-injection`). What limits the damage is in code
 and config: **which tools** it has, **whose identity** they act with, **which arguments** they accept, **who approves**

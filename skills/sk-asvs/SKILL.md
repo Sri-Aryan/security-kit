@@ -1,12 +1,14 @@
 ---
 name: sk-asvs
-description: Checks a web application against the OWASP Application Security Verification Standard (ASVS 5.0) at level 1, 2 or 3. Maps every SecurityKit report already produced onto ASVS chapters (encoding, validation, frontend, APIs, files, authentication, sessions, authorization, tokens, OAuth, cryptography, communication, configuration, data protection, architecture, logging), shows which chapters are assessed, partly assessed or not assessed and which skills to run next, then walks the remaining requirements chapter by chapter with evidence. Produces an indicative coverage report, never a certification. Writes security-report-asvs.md. Use when the user asks about ASVS, a verification level, a security requirements baseline for customers or audits, or types /sk-asvs.
+description: Maps SecurityKit reports onto OWASP ASVS 5.0 chapters at level 1, 2 or 3, shows what is assessed and walks the remaining requirements. Use when the user asks about ASVS, a verification level or a security requirements baseline, or types /sk-asvs.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-asvs: OWASP ASVS coverage
+
+**Scope.** Checks a web application against the OWASP Application Security Verification Standard (ASVS 5.0) at level 1, 2 or 3. Maps every SecurityKit report already produced onto ASVS chapters (encoding, validation, frontend, APIs, files, authentication, sessions, authorization, tokens, OAuth, cryptography, communication, configuration, data protection, architecture, logging), shows which chapters are assessed, partly assessed or not assessed and which skills to run next, then walks the remaining requirements chapter by chapter with evidence. Produces an indicative coverage report, never a certification. Writes security-report-asvs.md.
 
 ASVS is the requirement list many customers, pentesters and auditors use for web apps. This skill reuses what the
 other SecurityKit skills found, maps it onto the ASVS 5.0 chapters, shows what is still unassessed, and then reviews

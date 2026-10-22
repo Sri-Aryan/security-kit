@@ -1,12 +1,14 @@
 ---
 name: sk-ai
-description: Audits LLM features in any application, provider and framework against the OWASP Top 10 for LLM Applications 2025, covering prompt injection paths, model output reaching HTML, SQL, shell or eval, unvalidated structured output, system prompt secrets and leaks, PII/secrets/other users' data sent to the model, provider retention, authorization delegated to the model or the prompt, unsafe model loading (trust_remote_code, pickle weights, unpinned hub models), training-data poisoning, cost abuse (no max_tokens, no rate limits, caller-chosen model), provider keys in client bundles, prompt logging, and missing security evals. Umbrella skill that links to sk-prompt-injection, sk-agents and sk-rag. Writes security-report-ai.md. Use when the user asks to audit AI/LLM/chatbot/GPT/Claude features, or types /sk-ai.
+description: Audits LLM features against the OWASP Top 10 for LLM Applications, covering model output reaching HTML, SQL or shell, data sent to providers, system prompt leaks, unsafe model loading and cost abuse. Use when the user asks to audit AI, LLM, chatbot, GPT or Claude features, or types /sk-ai.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-ai: AI / LLM application audit
+
+**Scope.** Audits LLM features in any application, provider and framework against the OWASP Top 10 for LLM Applications 2025, covering prompt injection paths, model output reaching HTML, SQL, shell or eval, unvalidated structured output, system prompt secrets and leaks, PII/secrets/other users' data sent to the model, provider retention, authorization delegated to the model or the prompt, unsafe model loading (trust_remote_code, pickle weights, unpinned hub models), training-data poisoning, cost abuse (no max_tokens, no rate limits, caller-chosen model), provider keys in client bundles, prompt logging, and missing security evals. Umbrella skill that links to sk-prompt-injection, sk-agents and sk-rag. Writes security-report-ai.md.
 
 The model is an **untrusted component**: its input may be attacker-controlled, its output attacker-steered, and
 anything in its context may be repeated back. This skill maps every LLM feature (who calls it, what goes in, where the
