@@ -1,6 +1,7 @@
 ---
 name: sk-openapi
 description: Compares an OpenAPI/Swagger spec with the code to find shadow and stale endpoints, auth mismatches, open request schemas and sensitive response fields. Use when the user asks about API documentation drift, shadow APIs or API inventory, or types /sk-openapi.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

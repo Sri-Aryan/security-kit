@@ -1,6 +1,7 @@
 ---
 name: sk-oauth2
 description: Audits OAuth 2.0 and OpenID Connect clients, resource servers and authorization servers, covering PKCE, state and nonce, redirect URIs, ID token validation, scopes, audiences and token storage. Use when the project has OAuth/OIDC login or SSO or validates access tokens, or types /sk-oauth2.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

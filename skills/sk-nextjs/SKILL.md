@@ -1,6 +1,7 @@
 ---
 name: sk-nextjs
 description: Audits Next.js, SvelteKit, Nuxt and Remix server/client boundaries, covering Server Actions and route handlers without auth, middleware-only protection, data leaked through props, public env secrets and vulnerable versions. Use when the user asks about these frameworks' security, or types /sk-nextjs.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
