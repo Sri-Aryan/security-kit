@@ -20,6 +20,8 @@ import subprocess
 import sys
 import tempfile
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 SEVERITIES = ["Critical", "High", "Medium", "Low"]
 NEAR_LINES = 10  # a fix often shifts lines; a hit this close to the old line counts as "still there"
@@ -151,6 +153,7 @@ def cmd_mark(args):
         "title": f.get("title"), "verifiedBy": args.verified_by, "note": args.note,
         "fixedAt": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
     })
+    prepare_output(log_path)
     with open(log_path, "w", encoding="utf-8") as fh:
         json.dump(log, fh, indent=2)
         fh.write("\n")
