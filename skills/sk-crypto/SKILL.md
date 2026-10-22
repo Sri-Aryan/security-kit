@@ -1,12 +1,14 @@
 ---
 name: sk-crypto
-description: Audits how an application uses cryptography in any language, covering weak algorithms (MD5/SHA-1 for security, DES/3DES/RC4, small RSA keys), ECB and unauthenticated modes, static or reused IVs and nonces, hardcoded keys, keys derived with plain hashes or weak PBKDF2, non-cryptographic randomness, RSA PKCS#1 v1.5 encryption, hash-as-MAC and timing-unsafe comparisons, disabled TLS verification and old TLS versions, home-made crypto and deprecated libraries, key management and rotation, and encryption at rest. Based on the OWASP Cryptographic Storage, Key Management and TLS cheat sheets. Writes security-report-crypto.md. Use when the user asks about encryption, keys, hashing for integrity, TLS settings, or types /sk-crypto.
+description: Audits cryptography use, covering weak algorithms, ECB and unauthenticated modes, reused IVs, hardcoded keys, weak randomness, timing-unsafe comparisons, TLS settings and key management. Use when the user asks about encryption, keys, integrity hashing or TLS, or types /sk-crypto.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-crypto: cryptography audit
+
+**Scope.** Audits how an application uses cryptography in any language, covering weak algorithms (MD5/SHA-1 for security, DES/3DES/RC4, small RSA keys), ECB and unauthenticated modes, static or reused IVs and nonces, hardcoded keys, keys derived with plain hashes or weak PBKDF2, non-cryptographic randomness, RSA PKCS#1 v1.5 encryption, hash-as-MAC and timing-unsafe comparisons, disabled TLS verification and old TLS versions, home-made crypto and deprecated libraries, key management and rotation, and encryption at rest. Based on the OWASP Cryptographic Storage, Key Management and TLS cheat sheets. Writes security-report-crypto.md.
 
 Crypto fails quietly: the code works, the data looks scrambled, and an attacker can still read or forge it. This skill
 inventories every place the code encrypts, signs, hashes for integrity, derives keys, generates secrets or configures

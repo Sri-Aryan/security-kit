@@ -1,12 +1,14 @@
 ---
 name: sk-config
-description: Audits security misconfiguration of applications, frameworks and web servers in any stack, covering debug and development modes left on, stack traces and internal errors returned to clients, exposed admin and diagnostic endpoints (Spring actuators, pprof, H2 console, debug toolbars, status monitors, API explorers), default credentials, framework placeholder secrets and hardcoded fallback secrets, wildcard allowed hosts, directory listing and version banners, static servers rooted at the project folder, public source maps, and startup validation of configuration. Based on OWASP Top 10 A05 and the Error Handling and framework cheat sheets. Writes security-report-config.md. Use when the user asks about misconfiguration, production hardening, debug mode, error pages, or types /sk-config.
+description: Audits production misconfiguration, covering debug mode, stack traces sent to clients, exposed admin and diagnostic endpoints, default credentials, placeholder secrets and directory listing. Use when the user asks about misconfiguration, hardening, debug mode or error pages, or types /sk-config.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-config: security configuration audit
+
+**Scope.** Audits security misconfiguration of applications, frameworks and web servers in any stack, covering debug and development modes left on, stack traces and internal errors returned to clients, exposed admin and diagnostic endpoints (Spring actuators, pprof, H2 console, debug toolbars, status monitors, API explorers), default credentials, framework placeholder secrets and hardcoded fallback secrets, wildcard allowed hosts, directory listing and version banners, static servers rooted at the project folder, public source maps, and startup validation of configuration. Based on OWASP Top 10 A05 and the Error Handling and framework cheat sheets. Writes security-report-config.md.
 
 Misconfiguration is the gap between how a framework is set up for development and how it must run in production:
 debug pages, verbose errors, open actuators, fallback secrets, directory listings. This skill finds those settings,

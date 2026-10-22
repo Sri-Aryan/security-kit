@@ -1,12 +1,14 @@
 ---
 name: sk-compliance
-description: Maps SecurityKit findings to the controls of common compliance frameworks (SOC 2 Trust Services Criteria, ISO/IEC 27001:2022 Annex A, PCI DSS v4.0, HIPAA Security Rule, GDPR) so engineering work can be tied to audit evidence. Shows, per control, the related open findings, which controls have technical evidence from SecurityKit skills, which still need skills run, and which are process controls the team must document, then lists the evidence to collect. Indicative mapping, not an audit opinion or certification. Writes security-report-compliance.md. Use when the user prepares for SOC 2, ISO 27001, PCI, HIPAA or GDPR, answers a security questionnaire, or types /sk-compliance.
+description: Maps SecurityKit findings to SOC 2, ISO 27001, PCI DSS, HIPAA and GDPR controls and lists the evidence to collect (indicative, not a certification). Use when the user prepares for a compliance audit or security questionnaire, or types /sk-compliance.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-compliance: findings to framework controls
+
+**Scope.** Maps SecurityKit findings to the controls of common compliance frameworks (SOC 2 Trust Services Criteria, ISO/IEC 27001:2022 Annex A, PCI DSS v4.0, HIPAA Security Rule, GDPR) so engineering work can be tied to audit evidence. Shows, per control, the related open findings, which controls have technical evidence from SecurityKit skills, which still need skills run, and which are process controls the team must document, then lists the evidence to collect. Indicative mapping, not an audit opinion or certification. Writes security-report-compliance.md.
 
 Auditors ask "show me how you control X"; engineers have findings and fixes. This skill connects the two: it maps the
 open findings from SecurityKit reports to SOC 2, ISO 27001, PCI DSS, HIPAA and GDPR controls, shows where technical

@@ -1,12 +1,14 @@
 ---
 name: sk-csrf
-description: Audits cross-site request forgery defences in any web stack that authenticates with cookies, covering framework CSRF protection and where it is disabled or exempted (csrf().disable, csrf_exempt, skip verify_authenticity_token, IgnoreAntiforgeryToken), state-changing GET routes (delete, logout, approve, transfer), SameSite=None session cookies, Origin and Fetch Metadata checks, CORS with credentials for any or reflected origin, JSON endpoints accepting text/plain, login CSRF, and token handling (tokens in URLs, weak comparison). Based on the OWASP CSRF Prevention cheat sheet. Writes security-report-csrf.md. Use when the user asks about CSRF, XSRF, SameSite, cross-site requests, or types /sk-csrf.
+description: Audits CSRF defences in cookie-authenticated web apps, covering disabled or exempted framework protection, state-changing GET routes, SameSite, Origin checks and CORS with credentials. Use when the user asks about CSRF, XSRF, SameSite or cross-site requests, or types /sk-csrf.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-csrf: cross-site request forgery audit
+
+**Scope.** Audits cross-site request forgery defences in any web stack that authenticates with cookies, covering framework CSRF protection and where it is disabled or exempted (csrf().disable, csrf_exempt, skip verify_authenticity_token, IgnoreAntiforgeryToken), state-changing GET routes (delete, logout, approve, transfer), SameSite=None session cookies, Origin and Fetch Metadata checks, CORS with credentials for any or reflected origin, JSON endpoints accepting text/plain, login CSRF, and token handling (tokens in URLs, weak comparison). Based on the OWASP CSRF Prevention cheat sheet. Writes security-report-csrf.md.
 
 Browsers attach cookies to requests that other sites trigger. If the app authenticates with cookies, every
 state-changing request needs proof it came from the app's own pages: framework CSRF tokens, SameSite cookies, and

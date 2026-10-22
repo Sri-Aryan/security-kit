@@ -1,12 +1,14 @@
 ---
 name: sk-cloud
-description: Audits cloud infrastructure defined as code (Terraform/OpenTofu, CloudFormation/SAM/CDK, Pulumi, Azure Bicep/ARM, Serverless Framework) on AWS, Azure or GCP, covering public buckets and blobs, wildcard IAM policies and admin roles, admin and database ports open to the internet, public databases without backups or deletion protection, encryption at rest, KMS rotation, HTTPS and TLS policies, audit and flow logging, secrets in templates and variable defaults, IMDSv1, unauthenticated API gateways and function URLs, committed or unencrypted Terraform state, and unpinned modules. Based on the OWASP IaC Security and Secure Cloud Architecture cheat sheets and CIS benchmarks. Writes security-report-cloud.md. Use when the project has Terraform/CloudFormation/Bicep/Pulumi/serverless config and the user asks about cloud security, IaC, misconfigurations, or types /sk-cloud.
+description: Audits Terraform, CloudFormation/CDK, Pulumi, Bicep and Serverless config on AWS, Azure or GCP for public buckets, wildcard IAM, open ports, missing encryption and logging, and secrets in state. Use when the user asks about cloud or IaC security, or types /sk-cloud.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-cloud: cloud and infrastructure-as-code audit
+
+**Scope.** Audits cloud infrastructure defined as code (Terraform/OpenTofu, CloudFormation/SAM/CDK, Pulumi, Azure Bicep/ARM, Serverless Framework) on AWS, Azure or GCP, covering public buckets and blobs, wildcard IAM policies and admin roles, admin and database ports open to the internet, public databases without backups or deletion protection, encryption at rest, KMS rotation, HTTPS and TLS policies, audit and flow logging, secrets in templates and variable defaults, IMDSv1, unauthenticated API gateways and function URLs, committed or unencrypted Terraform state, and unpinned modules. Based on the OWASP IaC Security and Secure Cloud Architecture cheat sheets and CIS benchmarks. Writes security-report-cloud.md.
 
 Most cloud breaches are misconfigurations: a public bucket, a wildcard IAM policy, a database port open to the
 internet. When infrastructure is code, the cheapest place to stop them is the file that creates them. This skill
