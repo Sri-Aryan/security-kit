@@ -52,6 +52,9 @@ SENSITIVE = [
     ("ai", r"(?i)(llm|prompt|agent|openai|anthropic|rag|embedding|vector|mcp)", "sk-ai / sk-agents"),
     ("agent-config", r"(?i)(^|/)(\.mcp\.json|mcp\.json|\.claude/settings[^/]*\.json|\.codex/config\.toml|claude_desktop_config\.json)$", "sk-agents"),
     ("api-contract", r"(?i)(openapi|swagger)[^/]*\.(ya?ml|json)$|\.graphql$|schema\.gql$", "sk-openapi / sk-graphql"),
+    ("baas", r"(?i)(^|/)(supabase/|firestore\.rules$|storage\.rules$|database\.rules\.json$|pb_migrations/|convex/)", "sk-baas"),
+    ("platform", r"(?i)(^|/)(vercel\.json|netlify\.toml|_headers|_redirects|wrangler\.(toml|jsonc?)|render\.ya?ml|fly\.toml|railway\.(json|toml)|apphosting\.ya?ml)$", "sk-paas"),
+    ("server-boundary", r"(?i)(^|/)(middleware|proxy)\.[cm]?[jt]s$|(^|/)actions?(/|\.[jt]s$)|(^|/)app/.*route\.[jt]s$|next\.config", "sk-nextjs"),
 ]
 # Never review SecurityKit itself or its outputs: installed skills (with their rule examples), scan results, reports.
 NOT_REVIEWED = re.compile(r"(^|/)\.(claude|codex|agents|cursor|gemini|windsurf|roo|continue|amazonq)/(skills|plugins|commands|agents)/"

@@ -131,6 +131,9 @@ SKILL_MAP = {
     "sk-queue": merge(APPSEC, CONFIG), "sk-cache": merge(APPSEC, PRIVACY), "sk-grpc": merge(ACCESS, APPSEC, CRYPTO),
     "sk-domain": merge(CONFIG, {"soc2": ["CC6.6"]}), "sk-extension": APPSEC, "sk-dast": merge(APPSEC, {"pci": ["Req 11"], "iso27001": ["8.29"]}),
     "sk-repo": SDLC, "sk-incident": IR,
+    "sk-baas": merge(ACCESS, CONFIG, PRIVACY), "sk-nextjs": merge(ACCESS, APPSEC), "sk-ai-code": merge(SDLC, APPSEC),
+    "sk-paas": merge(CONFIG, ACCESS, {"soc2": ["CC6.6"]}), "sk-abuse": APPSEC, "sk-authprovider": merge(AUTHN, ACCESS),
+    "sk-passkeys": AUTHN, "sk-game": APPSEC, "sk-defaults": merge(CONFIG, APPSEC), "sk-variant": SDLC,
 }
 
 

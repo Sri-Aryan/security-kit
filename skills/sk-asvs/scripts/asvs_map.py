@@ -24,25 +24,26 @@ SEVERITIES = ["Critical", "High", "Medium", "Low"]
 # ASVS 5.0 chapters -> SecurityKit skills that test parts of them. Coverage is partial by nature.
 CHAPTERS = [
     ("V1", "Encoding and Sanitization", ["sk-inject", "sk-xss", "sk-ssrf", "sk-deserialize", "sk-database"]),
-    ("V2", "Validation and Business Logic", ["sk-validation", "sk-business", "sk-race", "sk-ratelimit"]),
-    ("V3", "Web Frontend Security", ["sk-browser", "sk-csrf", "sk-xss", "sk-redirect", "sk-cache"]),
-    ("V4", "API and Web Service", ["sk-api", "sk-rest", "sk-graphql", "sk-openapi", "sk-websocket", "sk-grpc", "sk-webhooks"]),
+    ("V2", "Validation and Business Logic", ["sk-validation", "sk-business", "sk-race", "sk-ratelimit", "sk-abuse"]),
+    ("V3", "Web Frontend Security", ["sk-browser", "sk-csrf", "sk-xss", "sk-redirect", "sk-cache", "sk-nextjs"]),
+    ("V4", "API and Web Service", ["sk-api", "sk-rest", "sk-graphql", "sk-openapi", "sk-websocket", "sk-grpc", "sk-webhooks", "sk-nextjs"]),
     ("V5", "File Handling", ["sk-upload"]),
-    ("V6", "Authentication", ["sk-auth", "sk-password", "sk-saml"]),
-    ("V7", "Session Management", ["sk-auth", "sk-tokens", "sk-browser"]),
-    ("V8", "Authorization", ["sk-authz", "sk-api"]),
+    ("V6", "Authentication", ["sk-auth", "sk-password", "sk-saml", "sk-authprovider", "sk-passkeys"]),
+    ("V7", "Session Management", ["sk-auth", "sk-tokens", "sk-browser", "sk-authprovider"]),
+    ("V8", "Authorization", ["sk-authz", "sk-api", "sk-baas", "sk-nextjs", "sk-authprovider"]),
     ("V9", "Self-contained Tokens", ["sk-tokens"]),
-    ("V10", "OAuth and OIDC", ["sk-oauth2"]),
+    ("V10", "OAuth and OIDC", ["sk-oauth2", "sk-authprovider"]),
     ("V11", "Cryptography", ["sk-crypto", "sk-password"]),
-    ("V12", "Secure Communication", ["sk-crypto", "sk-browser", "sk-grpc"]),
-    ("V13", "Configuration", ["sk-config", "sk-secrets", "sk-docker", "sk-cloud", "sk-cicd"]),
-    ("V14", "Data Protection", ["sk-privacy", "sk-cache", "sk-logging", "sk-database"]),
-    ("V15", "Secure Coding and Architecture", ["sk-design", "sk-deps", "sk-dos", "sk-queue"]),
+    ("V12", "Secure Communication", ["sk-crypto", "sk-browser", "sk-grpc", "sk-paas"]),
+    ("V13", "Configuration", ["sk-config", "sk-secrets", "sk-docker", "sk-cloud", "sk-cicd", "sk-paas", "sk-baas", "sk-defaults"]),
+    ("V14", "Data Protection", ["sk-privacy", "sk-cache", "sk-logging", "sk-database", "sk-baas"]),
+    ("V15", "Secure Coding and Architecture", ["sk-design", "sk-deps", "sk-dos", "sk-queue", "sk-defaults", "sk-ai-code"]),
     ("V16", "Security Logging and Error Handling", ["sk-logging", "sk-config"]),
     ("V17", "WebRTC", []),
 ]
 OUTSIDE_ASVS = ["sk-ai", "sk-prompt-injection", "sk-agents", "sk-rag", "sk-mobile", "sk-electron", "sk-extension",
-                "sk-domain", "sk-email", "sk-payments", "sk-tests", "sk-fuzz", "sk-repo", "sk-incident", "sk-dast"]
+                "sk-domain", "sk-email", "sk-payments", "sk-tests", "sk-fuzz", "sk-repo", "sk-incident", "sk-dast",
+                "sk-game", "sk-variant"]
 
 
 def load_reports(root):

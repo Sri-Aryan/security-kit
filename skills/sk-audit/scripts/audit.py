@@ -88,6 +88,15 @@ SIGNALS = [
     ("sk-domain", None, r"(?i)aws_route53_record|cloudflare_(dns_)?record|azurerm_dns_|google_dns_record_set|v=spf1|v=DMARC1", "DNS / email authentication"),
     ("sk-repo", r"(^|/)\.git(ignore|attributes)$|(^|/)\.github/", None, "repository hygiene"),
     ("sk-incident", None, None, "always: incident readiness (interactive)"),
+    ("sk-baas", r"(?i)(^|/)(supabase/|firestore\.rules$|storage\.rules$|database\.rules\.json$|firebase\.json$|pb_migrations/|convex/|amplify/data/)", r"(?i)@supabase/|supabase_flutter|from\s+supabase\s+import|firebase/(app|firestore|database|storage)|firebase-admin|\bappwrite\b|pocketbase|from\s+['\"]convex/|aws-amplify", "backend-as-a-service (Supabase, Firebase, ...)"),
+    ("sk-nextjs", r"(?i)(^|/)(next\.config\.[cm]?[jt]s|svelte\.config\.js|nuxt\.config\.[jt]s|remix\.config\.js|react-router\.config\.ts|astro\.config\.mjs)$", r"['\"]use server['\"]|from\s+['\"]next/|@sveltejs/kit|@remix-run/|from\s+['\"]#app", "full-stack framework (Next.js, SvelteKit, Nuxt, Remix)"),
+    ("sk-authprovider", None, r"(?i)@clerk/|next-auth|@auth/|better-auth|['\"]lucia['\"]|@auth0/|@supabase/(ssr|auth-helpers)|firebase/auth|@kinde-oss/|@workos-inc/|@stackframe/|aws-amplify/auth|@propelauth/|stytch|@descope/", "hosted auth provider / auth library"),
+    ("sk-passkeys", None, r"(?i)@simplewebauthn|webauthn|navigator\.credentials\.(create|get)|passkey|fido2|magic.?link|signInWithOtp|sendSignInLinkToEmail|verify_?otp|one.?time.?(code|password)", "passkeys, magic links or one-time codes"),
+    ("sk-abuse", None, r"(?i)\b(sign_?up|signup|register|free_?trial|trial_period|credits|referral|captcha|turnstile|quota|free_?tier)\b", "sign-up, trials, credits or referrals"),
+    ("sk-paas", r"(?i)(^|/)(vercel\.json|netlify\.toml|_headers|_redirects|wrangler\.(toml|jsonc?)|render\.ya?ml|fly\.toml|railway\.(json|toml)|Procfile|firebase\.json|apphosting\.ya?ml|\.do/app\.ya?ml|amplify\.ya?ml)$", None, "hosting platform config"),
+    ("sk-game", r"(?i)(^|/)(ProjectSettings/ProjectVersion\.txt|project\.godot|[^/]*\.uproject|default\.project\.json|[^/]*\.rbxlx?|[^/]*\.luau)$", r"UnityEngine|Unity\.Netcode|\bMirror\b|Photon\.|PlayFab|Nakama|colyseus|\bphaser\b|OnServerEvent|RemoteEvent", "game client or game server"),
+    ("sk-ai-code", None, None, "always: shortcuts typical of AI-written code"),
+    ("sk-defaults", None, None, "always: insecure defaults and fail-open checks"),
 ]
 
 
