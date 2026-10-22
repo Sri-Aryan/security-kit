@@ -1,6 +1,7 @@
 ---
 name: sk-ratelimit
 description: Audits rate limiting and quotas on login, signup, reset, OTP, search, AI and messaging, covering limiter keys, X-Forwarded-For spoofing, shared stores and bypasses. Use when the user asks about rate limiting, brute force, throttling, scraping or API abuse, or types /sk-ratelimit.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

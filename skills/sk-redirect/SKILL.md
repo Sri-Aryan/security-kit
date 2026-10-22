@@ -1,6 +1,7 @@
 ---
 name: sk-redirect
 description: Finds open redirects and unsafe forwards, covering next and returnUrl parameters, bypassable URL checks, login and SSO return URLs, and client-side navigation from query strings. Use when the user asks about open redirects or returnUrl safety, or types /sk-redirect.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

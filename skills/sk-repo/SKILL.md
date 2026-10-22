@@ -1,6 +1,7 @@
 ---
 name: sk-repo
 description: Audits repository hygiene, covering SECURITY.md, CODEOWNERS, branch protection, commit signing, .gitignore coverage, tracked sensitive files, secret scanning and dependency updates. Use when the user asks about repository security or branch protection, or types /sk-repo.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
