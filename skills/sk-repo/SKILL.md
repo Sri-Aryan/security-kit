@@ -1,12 +1,14 @@
 ---
 name: sk-repo
-description: Audits the security hygiene of the source repository itself on any platform (GitHub, GitLab, Bitbucket, Azure DevOps), covering a SECURITY.md disclosure policy, CODEOWNERS for sensitive paths, branch protection and required reviews, commit signing, .gitignore coverage of env files, keys and state files, sensitive files already tracked in git, secret scanning and SAST in CI or pre-commit hooks, Dependabot/Renovate, CI checks on pull requests, and repository access and MFA. Local checks run offline; platform settings are asked. Writes security-report-repo.md. Use when the user asks about repository security, branch protection, OpenSSF Scorecard-style hygiene, or types /sk-repo.
+description: Audits repository hygiene, covering SECURITY.md, CODEOWNERS, branch protection, commit signing, .gitignore coverage, tracked sensitive files, secret scanning and dependency updates. Use when the user asks about repository security or branch protection, or types /sk-repo.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-repo: repository hygiene audit
+
+**Scope.** Audits the security hygiene of the source repository itself on any platform (GitHub, GitLab, Bitbucket, Azure DevOps), covering a SECURITY.md disclosure policy, CODEOWNERS for sensitive paths, branch protection and required reviews, commit signing, .gitignore coverage of env files, keys and state files, sensitive files already tracked in git, secret scanning and SAST in CI or pre-commit hooks, Dependabot/Renovate, CI checks on pull requests, and repository access and MFA. Local checks run offline; platform settings are asked. Writes security-report-repo.md.
 
 The repository is where every change enters production. If anyone can push to main, if secrets get committed, or if
 nobody reviews CI changes, application controls don't matter much. A script checks what the local clone shows

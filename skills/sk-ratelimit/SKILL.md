@@ -1,12 +1,14 @@
 ---
 name: sk-ratelimit
-description: Audits rate limiting and quotas in any stack, covering limits on login, signup, password reset, OTP/MFA, search, export, AI calls and message sending, limiter keys (per user, account and IP), client-IP spoofing via X-Forwarded-For and trust-proxy settings, shared vs in-memory stores, bypasses through route variants, batching or skip conditions, page-size and cost quotas, and 429 responses. Writes security-report-ratelimit.md. Use when the user asks about rate limiting, brute force, throttling, SMS pumping, scraping, denial of wallet or API abuse, or types /sk-ratelimit.
+description: Audits rate limiting and quotas on login, signup, reset, OTP, search, AI and messaging, covering limiter keys, X-Forwarded-For spoofing, shared stores and bypasses. Use when the user asks about rate limiting, brute force, throttling, scraping or API abuse, or types /sk-ratelimit.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-ratelimit: rate limiting audit
+
+**Scope.** Audits rate limiting and quotas in any stack, covering limits on login, signup, password reset, OTP/MFA, search, export, AI calls and message sending, limiter keys (per user, account and IP), client-IP spoofing via X-Forwarded-For and trust-proxy settings, shared vs in-memory stores, bypasses through route variants, batching or skip conditions, page-size and cost quotas, and 429 responses. Writes security-report-ratelimit.md.
 
 A rate limit is only as good as **what it counts** (key), **where it counts** (store), and **what it covers**
 (routes, variants, batch interfaces). Inventory the sensitive and expensive operations, then check each one

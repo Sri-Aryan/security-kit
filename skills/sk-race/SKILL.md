@@ -1,12 +1,14 @@
 ---
 name: sk-race
-description: Audits race conditions and TOCTOU bugs in any language or database, covering read-modify-write of balances, stock and counters, check-then-insert uniqueness, single-use tokens/coupons/invites consumed non-atomically, count-then-insert quotas, missing transactions and isolation, process-local or expiry-less locks, non-idempotent order/payment endpoints, file TOCTOU and predictable temp files, and shared mutable state in request handlers. Writes security-report-race.md. Use when the user asks about race conditions, double spending, concurrency bugs, TOCTOU, idempotency, or limit-overrun attacks, or types /sk-race.
+description: Finds race conditions and TOCTOU bugs, covering balance and stock updates, check-then-insert, single-use tokens and coupons, quotas, missing transactions and non-idempotent endpoints. Use when the user asks about race conditions, double spending, concurrency or idempotency, or types /sk-race.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-race: race condition audit
+
+**Scope.** Audits race conditions and TOCTOU bugs in any language or database, covering read-modify-write of balances, stock and counters, check-then-insert uniqueness, single-use tokens/coupons/invites consumed non-atomically, count-then-insert quotas, missing transactions and isolation, process-local or expiry-less locks, non-idempotent order/payment endpoints, file TOCTOU and predictable temp files, and shared mutable state in request handlers. Writes security-report-race.md.
 
 Every **read → decide → write** sequence that is not atomic can be won by an attacker who sends many requests at
 once. Find the operations whose invariants matter (money, stock, quotas, one-time value, uniqueness), locate their

@@ -1,12 +1,14 @@
 ---
 name: sk-rag
-description: Audits retrieval-augmented generation (RAG) pipelines in any framework (LangChain, LlamaIndex, Haystack, custom) and vector store (pgvector, Qdrant, Weaviate, Pinecone, Chroma, Milvus, Elasticsearch/OpenSearch, Redis), covering document poisoning and ingestion scanning, source provenance, embedding exposure and model pinning, retrieved content in prompts, top-k bounds, per-chunk ACL metadata, retrieval-time permission filtering and tenant isolation, deletion propagation, vector database authentication and exposure, similarity score leakage, output validation, tool calls, cache isolation, logging and fail-closed behaviour. Based on the OWASP RAG Security cheat sheet. Writes security-report-rag.md. Use when the project has a knowledge base, embeddings, a vector store, semantic search or a "chat with your documents" feature and the user asks to audit it, or types /sk-rag.
+description: Audits RAG pipelines and vector stores, covering document poisoning, per-chunk access control, tenant isolation at retrieval, vector database exposure and deletion propagation. Use when the project has embeddings, a vector store or chat-with-your-documents, or types /sk-rag.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-rag: RAG pipeline audit
+
+**Scope.** Audits retrieval-augmented generation (RAG) pipelines in any framework (LangChain, LlamaIndex, Haystack, custom) and vector store (pgvector, Qdrant, Weaviate, Pinecone, Chroma, Milvus, Elasticsearch/OpenSearch, Redis), covering document poisoning and ingestion scanning, source provenance, embedding exposure and model pinning, retrieved content in prompts, top-k bounds, per-chunk ACL metadata, retrieval-time permission filtering and tenant isolation, deletion propagation, vector database authentication and exposure, similarity score leakage, output validation, tool calls, cache isolation, logging and fail-closed behaviour. Based on the OWASP RAG Security cheat sheet. Writes security-report-rag.md.
 
 RAG moves risk into the data pipeline. For each stage (sources, ingestion, embedding, index, retrieval, context
 assembly, generation, tools, caches, logs) ask three questions: **who can write here** (poisoning), **who can

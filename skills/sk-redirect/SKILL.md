@@ -1,12 +1,14 @@
 ---
 name: sk-redirect
-description: Finds open redirects and unsafe forwards in any web stack, covering server redirects to request-supplied next/returnUrl/redirect parameters, bypassable string validation (//host, /\host, userinfo, encoded variants, javascript:), login/logout/SSO return URLs, server-side forwards and X-Accel-Redirect driven by input, client-side location/router navigation from query parameters, meta refresh and Refresh headers, Referer-based redirects and generic /out?url= endpoints. Based on the OWASP Unvalidated Redirects and Forwards cheat sheet. Writes security-report-redirect.md. Use when the user asks about open redirects, returnUrl/next parameter safety, or types /sk-redirect.
+description: Finds open redirects and unsafe forwards, covering next and returnUrl parameters, bypassable URL checks, login and SSO return URLs, and client-side navigation from query strings. Use when the user asks about open redirects or returnUrl safety, or types /sk-redirect.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-redirect: open redirect audit
+
+**Scope.** Finds open redirects and unsafe forwards in any web stack, covering server redirects to request-supplied next/returnUrl/redirect parameters, bypassable string validation (//host, /\host, userinfo, encoded variants, javascript:), login/logout/SSO return URLs, server-side forwards and X-Accel-Redirect driven by input, client-side location/router navigation from query parameters, meta refresh and Refresh headers, Referer-based redirects and generic /out?url= endpoints. Based on the OWASP Unvalidated Redirects and Forwards cheat sheet. Writes security-report-redirect.md.
 
 A redirect whose target users can influence turns your domain into a phishing launchpad and, in login/SSO/OAuth flows,
 can leak codes and tokens. Inventory every redirect and forward, find which take request data (query, body, cookie,
