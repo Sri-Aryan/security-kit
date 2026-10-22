@@ -1,12 +1,14 @@
 ---
 name: sk-prompt-injection
-description: Audits applications that call large language models (chatbots, assistants, agents with tools, summarizers, text-to-SQL, coding agents) for prompt injection risk with any provider or framework, covering untrusted channels (user input, documents, web pages, emails, tool results, memory), system-prompt construction and secrets, tool authorization and least privilege, human approval for high-impact actions, executing model output as code/SQL, unsafe rendering of model output (XSS, Markdown image exfiltration), output validation, context isolation between users, memory poisoning, rate/token limits, logging and safe injection testing. Based on the OWASP LLM Prompt Injection Prevention and AI Agent Security cheat sheets. Writes security-report-prompt-injection.md. Use when the project integrates an LLM and the user asks about prompt injection, jailbreaks, AI agent or tool safety, or types /sk-prompt-injection.
+description: Audits LLM apps for prompt injection, covering untrusted input channels, system prompt construction, tool permissions and approvals, executing model output, unsafe rendering and memory poisoning. Use when the user asks about prompt injection, jailbreaks or AI tool safety, or types /sk-prompt-injection.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-prompt-injection: LLM integration audit
+
+**Scope.** Audits applications that call large language models (chatbots, assistants, agents with tools, summarizers, text-to-SQL, coding agents) for prompt injection risk with any provider or framework, covering untrusted channels (user input, documents, web pages, emails, tool results, memory), system-prompt construction and secrets, tool authorization and least privilege, human approval for high-impact actions, executing model output as code/SQL, unsafe rendering of model output (XSS, Markdown image exfiltration), output validation, context isolation between users, memory poisoning, rate/token limits, logging and safe injection testing. Based on the OWASP LLM Prompt Injection Prevention and AI Agent Security cheat sheets. Writes security-report-prompt-injection.md.
 
 The model cannot reliably tell instructions from data, so assume any text that reaches it can steer it.
 The audit question is therefore **"what can a tricked model do?"** Three concepts answer it in every stack:

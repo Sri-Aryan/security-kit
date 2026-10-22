@@ -1,12 +1,14 @@
 ---
 name: sk-payments
-description: Audits payment integrations with any provider (Stripe, PayPal, Adyen, Braintree, Square, Razorpay, Mollie, Paddle and others), covering client-controlled amounts and line items, fulfilment from redirect/return URLs instead of verified confirmation, webhook signature verification, matching amount/currency/order, idempotency keys and duplicate events, order state machines and reconciliation, refund authorization and bounds, subscription entitlements from client input, secret keys in client code, raw card data (PCI scope), card-testing defenses, payout protection and payment logging. Based on the OWASP Third-Party Payment Gateway Integration cheat sheet. Writes security-report-payments.md. Use when the project takes payments, sells subscriptions or issues refunds/payouts and the user asks to audit checkout or payment security, or types /sk-payments.
+description: Audits payment integrations (Stripe, PayPal, Adyen, Paddle and others), covering client-set amounts, fulfilment without verified confirmation, webhook signatures, idempotency, refunds and subscription entitlements. Use when the project takes payments, or types /sk-payments.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-payments: payment flow audit
+
+**Scope.** Audits payment integrations with any provider (Stripe, PayPal, Adyen, Braintree, Square, Razorpay, Mollie, Paddle and others), covering client-controlled amounts and line items, fulfilment from redirect/return URLs instead of verified confirmation, webhook signature verification, matching amount/currency/order, idempotency keys and duplicate events, order state machines and reconciliation, refund authorization and bounds, subscription entitlements from client input, secret keys in client code, raw card data (PCI scope), card-testing defenses, payout protection and payment logging. Based on the OWASP Third-Party Payment Gateway Integration cheat sheet. Writes security-report-payments.md.
 
 The browser is never the source of truth for money. **Amounts** come from your database, **payment status** comes from
 the provider (verified webhook or API lookup), and **card data** goes straight from the browser to the provider.

@@ -1,12 +1,14 @@
 ---
 name: sk-privacy
-description: Audits how an application handles personal data in any stack, covering a personal-data inventory, data minimization, field-level encryption of highly sensitive data, personal data in URLs, full-record API responses and browser storage, personal data sent to analytics, marketing, support and AI providers, tracking scripts loaded without consent, data export and account deletion (including search, caches, third parties and backups), retention and purging, production data copied to development, and data residency. Based on the OWASP User Privacy Protection cheat sheet and Top 10 Privacy Risks; engineering evidence, not legal advice. Writes security-report-privacy.md. Use when the user asks about privacy, GDPR/CCPA readiness, PII handling, data deletion or retention, tracking consent, or types /sk-privacy.
+description: Audits personal data handling, covering a data inventory, minimisation, sensitive fields, data sent to analytics and AI providers, tracking consent, export, deletion and retention. Use when the user asks about privacy, GDPR or CCPA readiness, PII, data deletion or retention, or types /sk-privacy.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-privacy: personal-data handling audit
+
+**Scope.** Audits how an application handles personal data in any stack, covering a personal-data inventory, data minimization, field-level encryption of highly sensitive data, personal data in URLs, full-record API responses and browser storage, personal data sent to analytics, marketing, support and AI providers, tracking scripts loaded without consent, data export and account deletion (including search, caches, third parties and backups), retention and purging, production data copied to development, and data residency. Based on the OWASP User Privacy Protection cheat sheet and Top 10 Privacy Risks; engineering evidence, not legal advice. Writes security-report-privacy.md.
 
 Privacy failures are rarely exploits: personal data collected without need, sent to an analytics vendor, left in a
 URL, copied to a laptop, or never deleted. This skill answers four engineering questions: **what personal data do we

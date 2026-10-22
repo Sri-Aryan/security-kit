@@ -1,12 +1,14 @@
 ---
 name: sk-password
-description: Audits the full password lifecycle in any language or framework, covering hashing algorithm and work factors (Argon2id, scrypt, bcrypt, PBKDF2 against OWASP minimums), salts and peppers, bcrypt 72-byte pre-hashing pitfalls, legacy-hash upgrades, plaintext passwords in storage, logs or URLs, constant-time verification, length caps, password policy (length, Unicode, breached-password checks, no composition/rotation rules), password change, the forgot-password/reset flow (enumeration, token randomness/expiry/storage, Host-header links, rate limits, session revocation), brute force/credential stuffing and default passwords. Based on the OWASP Password Storage and Forgot Password cheat sheets. Writes security-report-password.md. Use when the user asks to audit password storage, hashing, password policy, reset/forgot-password flows, or types /sk-password.
+description: Audits the password lifecycle, covering hashing algorithms and work factors, plaintext storage, password policy and breached-password checks, and the reset flow (tokens, expiry, enumeration). Use when the user asks about password storage, hashing, policy or forgot-password flows, or types /sk-password.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-password: password lifecycle audit
+
+**Scope.** Audits the full password lifecycle in any language or framework, covering hashing algorithm and work factors (Argon2id, scrypt, bcrypt, PBKDF2 against OWASP minimums), salts and peppers, bcrypt 72-byte pre-hashing pitfalls, legacy-hash upgrades, plaintext passwords in storage, logs or URLs, constant-time verification, length caps, password policy (length, Unicode, breached-password checks, no composition/rotation rules), password change, the forgot-password/reset flow (enumeration, token randomness/expiry/storage, Host-header links, rate limits, session revocation), brute force/credential stuffing and default passwords. Based on the OWASP Password Storage and Forgot Password cheat sheets. Writes security-report-password.md.
 
 A password goes through five stages in every system: it is **set** (registration, admin creation, seeding),
 **stored** (hashed, ideally with the right algorithm and parameters), **checked** (login, re-auth),

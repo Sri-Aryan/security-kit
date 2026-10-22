@@ -1,12 +1,14 @@
 ---
 name: sk-queue
-description: Audits message queues, background jobs and scheduled tasks in any stack (RabbitMQ, Kafka, SQS/SNS, Pub/Sub, Service Bus, NATS, Redis; Sidekiq, Celery, BullMQ, RQ, Hangfire, Laravel queues, Oban, Temporal; cron), covering broker authentication and TLS (guest/guest, password-less Redis, PLAINTEXT Kafka), who may publish, payload validation and unsafe serializers (Celery pickle, JMS ObjectMessage, trusted packages *), authorization re-checked when jobs run, idempotency under at-least-once delivery, retry limits and dead-letter queues, secrets and personal data in payloads, unprotected job dashboards (Sidekiq Web, Bull Board, Flower, Hangfire, Horizon), scheduled tasks and enqueue flooding. Writes security-report-queue.md. Use when the project uses queues, workers or cron jobs and the user asks about their security, or types /sk-queue.
+description: Audits message queues, background jobs and cron (RabbitMQ, Kafka, SQS, Redis, Sidekiq, Celery, BullMQ and others), covering broker auth, unsafe serializers, authorization in workers, idempotency and exposed job dashboards. Use when the project uses queues or workers, or types /sk-queue.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-queue: queues, background jobs and scheduled tasks audit
+
+**Scope.** Audits message queues, background jobs and scheduled tasks in any stack (RabbitMQ, Kafka, SQS/SNS, Pub/Sub, Service Bus, NATS, Redis; Sidekiq, Celery, BullMQ, RQ, Hangfire, Laravel queues, Oban, Temporal; cron), covering broker authentication and TLS (guest/guest, password-less Redis, PLAINTEXT Kafka), who may publish, payload validation and unsafe serializers (Celery pickle, JMS ObjectMessage, trusted packages *), authorization re-checked when jobs run, idempotency under at-least-once delivery, retry limits and dead-letter queues, secrets and personal data in payloads, unprotected job dashboards (Sidekiq Web, Bull Board, Flower, Hangfire, Horizon), scheduled tasks and enqueue flooding. Writes security-report-queue.md.
 
 Async work moves trust across time and processes: a message written now is acted on later by a worker with broad
 privileges. This skill treats every message as untrusted input from whoever can publish to that queue, and every job
