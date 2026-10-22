@@ -1,6 +1,7 @@
 ---
 name: sk-authprovider
 description: Audits Clerk, Auth0, NextAuth/Auth.js, Better Auth, Supabase Auth and Firebase Auth integrations for unverified tokens, client-sent user IDs, roles in user-editable metadata, unsigned webhooks and unsafe account linking. Use when the user asks about these providers, or types /sk-authprovider.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

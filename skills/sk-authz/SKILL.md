@@ -1,6 +1,7 @@
 ---
 name: sk-authz
 description: Audits access control, covering the permission model, central enforcement, default deny, object-level checks (IDOR), multi-tenant isolation, role escalation and field-level filtering. Use when the user asks about access control, permissions, roles, multi-tenancy or privilege escalation, or types /sk-authz.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

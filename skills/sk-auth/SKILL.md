@@ -1,6 +1,7 @@
 ---
 name: sk-auth
 description: Audits authentication, covering login brute force, account enumeration, password reset, MFA, session fixation, logout, cookie flags and SSO account linking. Use when the user asks to audit login, signup, passwords, reset, sessions, MFA or SSO, or types /sk-auth.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
