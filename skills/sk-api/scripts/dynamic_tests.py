@@ -28,6 +28,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 EVIL_ORIGIN = "https://securitykit-probe.invalid"
 STACK_RE = re.compile(
@@ -322,7 +324,7 @@ def main(argv=None):
         sys.exit(f"error: {e}")
     text = json.dumps(result, indent=2, ensure_ascii=False)
     if args.out:
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"{len(result['candidates'])} candidates, {result['requests_sent']} requests -> {args.out}", file=sys.stderr)

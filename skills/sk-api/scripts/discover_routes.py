@@ -25,6 +25,8 @@ import os
 import re
 import sys
 
+from sk_outputs import prepare_output
+
 VERSION = "0.1.0"
 
 SKIP_DIRS = {
@@ -1120,7 +1122,7 @@ def main(argv=None):
         return 0
     text = json.dumps(result, indent=2)
     if args.out:
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"wrote {result['summary']['routes']} routes to {args.out}", file=sys.stderr)
