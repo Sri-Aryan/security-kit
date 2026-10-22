@@ -1,12 +1,14 @@
 ---
 name: sk-openapi
-description: Audits an API's OpenAPI/Swagger contract against its code in any language or framework, covering undocumented (shadow) and stale endpoints, spec-vs-code auth mismatches, missing or optional security requirements, weak auth schemes, open request schemas (mass assignment), sensitive response fields, missing limits and exposed hosts or secrets. Writes security-report-openapi.md with evidence and fixes. Use when the project has (or should have) an OpenAPI/Swagger spec and the user asks to check API documentation, contract drift, shadow APIs or API inventory (OWASP API9), or types /sk-openapi.
+description: Compares an OpenAPI/Swagger spec with the code to find shadow and stale endpoints, auth mismatches, open request schemas and sensitive response fields. Use when the user asks about API documentation drift, shadow APIs or API inventory, or types /sk-openapi.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-openapi: API contract audit
+
+**Scope.** Audits an API's OpenAPI/Swagger contract against its code in any language or framework, covering undocumented (shadow) and stale endpoints, spec-vs-code auth mismatches, missing or optional security requirements, weak auth schemes, open request schemas (mass assignment), sensitive response fields, missing limits and exposed hosts or secrets. Writes security-report-openapi.md with evidence and fixes.
 
 A spec is a **claim** about the API. Security problems live where the claim and the code disagree
 (undocumented routes nobody reviews, operations the spec says are secured but the code leaves open)

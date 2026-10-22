@@ -1,12 +1,14 @@
 ---
 name: sk-inject
-description: Finds injection vulnerabilities of every kind in any language, including SQL (concatenation, interpolation, ORM raw APIs, dynamic ORDER BY), NoSQL operator injection, OS command and argument injection, eval/dynamic code and module loading, server-side template injection, expression language injection, LDAP and XPath injection, XXE, HTTP header/CRLF injection, log forging, regex injection/ReDoS, path traversal and CSV formula injection. Based on the OWASP Injection Prevention family of cheat sheets. Writes security-report-inject.md. Use when the user asks to find injection bugs, SQLi, command injection, SSTI, or audit how input reaches interpreters, or types /sk-inject.
+description: Finds injection of every kind, including SQL, NoSQL, OS command, eval, template (SSTI), LDAP, XPath, XXE, header/CRLF, log forging and path traversal. Use when the user asks to find injection bugs, SQLi, command injection or SSTI, or types /sk-inject.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-inject: injection audit
+
+**Scope.** Finds injection vulnerabilities of every kind in any language, including SQL (concatenation, interpolation, ORM raw APIs, dynamic ORDER BY), NoSQL operator injection, OS command and argument injection, eval/dynamic code and module loading, server-side template injection, expression language injection, LDAP and XPath injection, XXE, HTTP header/CRLF injection, log forging, regex injection/ReDoS, path traversal and CSV formula injection. Based on the OWASP Injection Prevention family of cheat sheets. Writes security-report-inject.md.
 
 Injection happens whenever data is concatenated into text that another interpreter parses: a database, a shell, a
 template engine, an expression evaluator, an LDAP server, an XML parser, a regex engine, a filesystem path, a

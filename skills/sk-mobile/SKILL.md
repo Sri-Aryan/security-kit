@@ -1,12 +1,14 @@
 ---
 name: sk-mobile
-description: Audits Android and iOS apps (Kotlin/Java, Swift/Objective-C, React Native, Expo, Flutter, Capacitor/Ionic, .NET MAUI) against OWASP MASVS v2, covering tokens and personal data in SharedPreferences/UserDefaults/AsyncStorage instead of Keystore/Keychain, secrets shipped in the app, cleartext traffic (usesCleartextTraffic, NSAllowsArbitraryLoads), disabled TLS validation and pinning, exported components and content providers, unverified deep links and deep-link parameters reaching WebViews, risky WebView settings (JavaScript bridges, file access, originWhitelist *), debuggable and backup flags, sensitive logs, biometrics not bound to keys, screenshot protection and server-side integrity checks. Writes security-report-mobile.md. Use when the project contains a mobile app and the user asks about mobile security, MASVS, or types /sk-mobile.
+description: Audits Android and iOS apps (native, React Native, Expo, Flutter, Capacitor, MAUI) against OWASP MASVS, covering insecure storage, shipped secrets, cleartext traffic, exported components, deep links and WebViews. Use when the project has a mobile app, or types /sk-mobile.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-mobile: mobile app security audit
+
+**Scope.** Audits Android and iOS apps (Kotlin/Java, Swift/Objective-C, React Native, Expo, Flutter, Capacitor/Ionic, .NET MAUI) against OWASP MASVS v2, covering tokens and personal data in SharedPreferences/UserDefaults/AsyncStorage instead of Keystore/Keychain, secrets shipped in the app, cleartext traffic (usesCleartextTraffic, NSAllowsArbitraryLoads), disabled TLS validation and pinning, exported components and content providers, unverified deep links and deep-link parameters reaching WebViews, risky WebView settings (JavaScript bridges, file access, originWhitelist *), debuggable and backup flags, sensitive logs, biometrics not bound to keys, screenshot protection and server-side integrity checks. Writes security-report-mobile.md.
 
 Assume the attacker has the app and a rooted or jailbroken phone: they can unpack it, read its storage, hook its code
 and replay its requests. This skill checks the app keeps secrets out of the binary, keeps sensitive data in

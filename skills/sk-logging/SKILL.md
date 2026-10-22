@@ -1,12 +1,14 @@
 ---
 name: sk-logging
-description: Audits security logging and monitoring in any language and logging stack, covering whether security events are logged (logins, failures, lockouts, 401/403, role changes, admin actions), audit trails for sensitive changes, passwords, tokens, headers and personal data leaking into logs and error trackers (Sentry, session replay), log injection, structured logs with correlation IDs, silently swallowed errors, debug levels in production, central log storage, retention and alerting. Based on the OWASP Logging and Logging Vocabulary cheat sheets and Top 10 A09. Writes security-report-logging.md. Use when the user asks about logging, audit trails, monitoring, detection, sensitive data in logs, or types /sk-logging.
+description: Audits security logging and monitoring, covering missing security events, audit trails, secrets and personal data in logs, log injection, swallowed errors, retention and alerting. Use when the user asks about logging, audit trails, monitoring or sensitive data in logs, or types /sk-logging.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-logging: security logging and monitoring audit
+
+**Scope.** Audits security logging and monitoring in any language and logging stack, covering whether security events are logged (logins, failures, lockouts, 401/403, role changes, admin actions), audit trails for sensitive changes, passwords, tokens, headers and personal data leaking into logs and error trackers (Sentry, session replay), log injection, structured logs with correlation IDs, silently swallowed errors, debug levels in production, central log storage, retention and alerting. Based on the OWASP Logging and Logging Vocabulary cheat sheets and Top 10 A09. Writes security-report-logging.md.
 
 Most breaches are found late, and often by someone else. Logging decides whether you notice an attack, can
 investigate it, and can prove what happened, without the logs themselves becoming a leak. This skill checks three

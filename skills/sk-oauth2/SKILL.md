@@ -1,12 +1,14 @@
 ---
 name: sk-oauth2
-description: Audits OAuth 2.0 and OpenID Connect implementations in any language or library, whether the project is a client (social/SSO login), a resource server (API accepting access tokens) or an authorization server. Covers implicit and password grants, PKCE, state and nonce, redirect URI handling and open redirects, mix-up attacks, ID token validation, account linking by email, tokens in URLs or localStorage, scopes, client secrets in browser/mobile code, access-token audience and scope checks, authorization-code and redirect rules for authorization servers, and TLS. Based on the OWASP OAuth2 cheat sheet (RFC 9700). Writes security-report-oauth2.md. Use when the project implements OAuth/OIDC login, "Sign in with …", SSO, or validates OAuth access tokens, or the user types /sk-oauth2.
+description: Audits OAuth 2.0 and OpenID Connect clients, resource servers and authorization servers, covering PKCE, state and nonce, redirect URIs, ID token validation, scopes, audiences and token storage. Use when the project has OAuth/OIDC login or SSO or validates access tokens, or types /sk-oauth2.
 metadata:
   version: 0.1.0
   author: SecurityKit
 ---
 
 # sk-oauth2: OAuth 2.0 / OpenID Connect audit
+
+**Scope.** Audits OAuth 2.0 and OpenID Connect implementations in any language or library, whether the project is a client (social/SSO login), a resource server (API accepting access tokens) or an authorization server. Covers implicit and password grants, PKCE, state and nonce, redirect URI handling and open redirects, mix-up attacks, ID token validation, account linking by email, tokens in URLs or localStorage, scopes, client secrets in browser/mobile code, access-token audience and scope checks, authorization-code and redirect rules for authorization servers, and TLS. Based on the OWASP OAuth2 cheat sheet (RFC 9700). Writes security-report-oauth2.md.
 
 OAuth security depends on which **role** the project plays. A **client** must use Authorization Code + PKCE,
 bind every login to the user's session (state/nonce), keep redirects fixed, and validate ID tokens before
