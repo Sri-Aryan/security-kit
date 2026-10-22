@@ -25,6 +25,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import sk_scan  # noqa: E402  (shipped next to this script)
 
+from sk_outputs import prepare_output
+
 ENV_FILE = re.compile(r"(^|/)\.env(\.[\w.-]+)?$|(^|/)[\w.-]+\.env$", re.I)
 ENV_EXAMPLE = re.compile(r"\.(example|sample|template|dist|defaults?)$", re.I)
 
@@ -155,7 +157,7 @@ def main(argv=None):
     }
     text = json.dumps(result, indent=2)
     if args.out:
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+        prepare_output(args.out)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"{commits} commits, {len(findings)} secrets ({result['history_only']} history-only) -> {args.out}", file=sys.stderr)
