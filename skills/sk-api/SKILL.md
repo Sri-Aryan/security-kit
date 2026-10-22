@@ -1,6 +1,7 @@
 ---
 name: sk-api
 description: Audits a project's APIs for authentication, object-level authorization (IDOR/BOLA), injection, error handling and missing tests (Express, NestJS, FastAPI, Flask, Django, Spring, Go). Use when the user asks to audit API security or review endpoints before release, or types /sk-api.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

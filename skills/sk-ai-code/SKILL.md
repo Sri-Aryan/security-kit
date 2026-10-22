@@ -1,6 +1,7 @@
 ---
 name: sk-ai-code
 description: Finds shortcuts typical of AI-written or vibe-coded apps, like placeholder auth, security TODOs, disabled TLS or CSRF checks, mass assignment, secret fallbacks, debug routes and hallucinated packages. Use for a pre-launch check of AI-generated code, or types /sk-ai-code.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit

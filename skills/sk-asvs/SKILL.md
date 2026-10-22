@@ -1,6 +1,7 @@
 ---
 name: sk-asvs
 description: Maps SecurityKit reports onto OWASP ASVS 5.0 chapters at level 1, 2 or 3, shows what is assessed and walks the remaining requirements. Use when the user asks about ASVS, a verification level or a security requirements baseline, or types /sk-asvs.
+disable-model-invocation: true
 metadata:
   version: 0.1.0
   author: SecurityKit
