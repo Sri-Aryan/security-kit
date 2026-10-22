@@ -6,7 +6,7 @@
       "title": "Workflows",
       "blurb": "Start here: whole-project audits, everyday change reviews, and fixing what was found.",
       "skills": [
-        { "name": "sk-help", "summary": "List every SecurityKit command, grouped, with a one-line description" },
+        { "name": "sk-help", "summary": "Where to start for this project, then every SecurityKit command, grouped" },
         { "name": "sk-audit", "summary": "Run every relevant skill and produce one combined, deduplicated report and score" },
         { "name": "sk-review", "summary": "Fast security review of the current diff, branch or PR only" },
         { "name": "sk-fix", "summary": "Work through findings from any report, applying approved fixes with re-verification" },

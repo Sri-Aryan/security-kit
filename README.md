@@ -41,7 +41,7 @@ Requires Node.js 18+ and Python 3. [Semgrep](https://semgrep.dev) is optional; `
 In your agent, inside the project:
 
 ```text
-/sk-help      see every command, grouped
+/sk-help      what to run first for this project, and every command
 /sk-audit     audit the whole project → security-report-audit.md
 /sk-review    review only your current changes
 /sk-fix       fix findings one by one, with your approval
@@ -62,7 +62,7 @@ sessions that don't use it. (Codex doesn't read the `disable-model-invocation` s
 
 | Command | What it does |
 |---|---|
-| `/sk-help` | List every SecurityKit command, grouped, with a one-line description |
+| `/sk-help` | Where to start for this project, then every SecurityKit command, grouped |
 | `/sk-audit` | Run every relevant skill and produce one combined, deduplicated report and score |
 | `/sk-review` | Fast security review of the current diff, branch or PR only |
 | `/sk-fix` | Work through findings from any report, applying approved fixes with re-verification |

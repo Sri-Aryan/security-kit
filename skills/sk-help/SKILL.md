@@ -1,6 +1,6 @@
 ---
 name: sk-help
-description: Lists every SecurityKit command grouped by area, with a one-line description and whether it is installed. Use when the user asks what SecurityKit can do, which security skills exist or where to start, or types /sk-help.
+description: Shows where to start with SecurityKit for this project (detects the stack and recommends the first few commands) and lists every command grouped by area. Use when the user asks what SecurityKit can do, which security skills exist or where to start, or types /sk-help.
 metadata:
   version: 0.1.0
   author: SecurityKit
@@ -8,15 +8,52 @@ metadata:
 
 # SecurityKit help
 
-**Scope.** Lists every SecurityKit command grouped by area (workflows, APIs, identity and access, injection and input, web and browser, data/privacy/crypto, business logic, AI and agents, apps and platforms, supply chain and infrastructure, design/testing/assurance) with a one-line description of each and whether it is installed.
+**Scope.** Shows a new user where to start: detects what this project is built with and recommends the first few SecurityKit commands for it, then lists the workflow commands and an index of every other group (workflows, APIs, identity and access, injection and input, web and browser, data/privacy/crypto, business logic, AI and agents, apps and platforms, supply chain and infrastructure, design/testing/assurance). `/sk-help all` prints every command with a one-line description and whether it is installed; `/sk-help <group>` prints one group.
 
-Show the user the grouped command list below. Do not run any scans from this skill.
+The full list is too long to choose from on a first visit, so the default view is short. Never run scans or modify
+files from this skill. The detection below only reads file names and manifests and prints to the chat.
 
-1. Check which `sk-*` skill folders exist next to this one (the folder that contains this skill). In the
-   **Status** column write `✔ installed` or `not installed`.
-2. Print each group as a level-3 heading (`### Workflows`), its one-line intro in italics, then its table, keeping
-   the order below. With `/sk-help <group>` (e.g. `/sk-help ai`, `/sk-help api`), print only that group.
-3. After the tables, print "Where to start", "Common options" and "Notes" exactly as written below.
+`$SKILL` is the folder containing this file; the other skills are its sibling folders (`$SKILL/../sk-*`).
+Use `python3` (or `python` / `py -3`).
+
+## Which view
+
+| Invocation | Show |
+|---|---|
+| `/sk-help` | **Start here** for this project, then the Workflows table, then the group index. |
+| `/sk-help all` | Every group's full table (the tables below), then "Where to start", "Common options" and "Notes". |
+| `/sk-help <group>` | That group's heading, intro and table only. Group IDs: `workflows`, `api`, `identity`, `input`, `web`, `data`, `logic`, `ai`, `apps`, `infra`, `design`; also accept a group's title or an obvious word ("auth", "injection", "docker"). |
+
+In every table you print, fill the **Status** column with `✔ installed` or `not installed` by checking which
+`sk-*` folders exist next to this skill's folder.
+
+## Default view (`/sk-help`)
+
+1. **Detect.** If the current folder looks like a project (it has source files or a manifest such as
+   `package.json`, `pyproject.toml`, `go.mod`, `pom.xml`, `Gemfile`, `composer.json`, `*.csproj`), run
+   `python3 $SKILL/../sk-audit/scripts/audit.py plan --root .` (no `--out`: it prints JSON and writes nothing).
+   Skip this step, and say why in one line, if it is not a project, Python is missing, `sk-audit` is not installed
+   or the command fails.
+2. **Start here.** From the plan's `run` list, print:
+   - `**Detected:**` one line naming the stack from the concrete evidence (e.g. "Express API, JWT auth, SQLite,
+     outbound fetch()"). Use only rows whose evidence is a file or a match, not `always`.
+   - `### Start here for this project` with **three** numbered commands (five at most), each with a short reason
+     that cites its evidence: `1. /sk-authz: roles and ownership checks (db.js:7 has a role column)`.
+     Pick skills with concrete evidence over `always` ones, and areas where one bug exposes other users' data or
+     money (authz, auth, tokens, API, BaaS rules, payments, AI agents, uploads) over hardening (headers, logging,
+     config). Add `/sk-secrets` last if there are fewer than three.
+   - One line: `Or all of them at once: /sk-audit --quick (N skills apply to this project).`, with N = the length
+     of `run`.
+   - If `not_installed` is not empty: `Also relevant but not installed: sk-x, sk-y` and the command
+     `npx github:getsecuritykit/kit init --skills sk-x,sk-y`.
+   Without detection, print instead: `Run /sk-audit --quick for a first overview of the whole project, or
+   /sk-review before your next commit.`
+3. **Workflows.** Print the Workflows heading, intro and table from below.
+4. **Index.** Print `### Everything else` and one line per remaining group, in the order below:
+   `**APIs** (7): /sk-api, /sk-rest, /sk-graphql, ...`, listing every command in the group. Finish with:
+   `Details: /sk-help <group> (e.g. /sk-help ai) · Everything: /sk-help all · Or just ask, e.g. "check my JWT
+   handling": /sk-audit picks the matching skill.`
+5. Print "Notes" (below) and stop. Don't print "Where to start" or "Common options" in this view.
 
 <!-- catalog:start (generated from skills/catalog.json by tools/gen_catalog_docs.py; do not edit by hand) -->
 ### Workflows
@@ -25,7 +62,7 @@ Show the user the grouped command list below. Do not run any scans from this ski
 
 | Command | What it does | Status |
 |---|---|---|
-| `/sk-help` | List every SecurityKit command, grouped, with a one-line description | |
+| `/sk-help` | Where to start for this project, then every SecurityKit command, grouped | |
 | `/sk-audit` | Run every relevant skill and produce one combined, deduplicated report and score | |
 | `/sk-review` | Fast security review of the current diff, branch or PR only | |
 | `/sk-fix` | Work through findings from any report, applying approved fixes with re-verification | |
@@ -172,7 +209,9 @@ Show the user the grouped command list below. Do not run any scans from this ski
 - **Whole project:** `/sk-audit` picks the skills that apply, runs them, and writes one combined report.
 - **Every change:** `/sk-review` checks just your diff before you commit or merge.
 - **Fixing:** `/sk-fix` works through findings one by one, with your approval, and re-verifies each fix.
-- **One area:** run any skill above directly, e.g. `/sk-inject` or `/sk-agents`.
+- **One area:** run any skill above directly, e.g. `/sk-inject` or `/sk-agents`, or just ask ("check my JWT
+  handling") and `/sk-audit` picks the matching skill.
+- **Not sure:** `/sk-help` with no arguments recommends the first three commands for this project.
 
 ## Common options
 
